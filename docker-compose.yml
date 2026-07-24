@@ -1,0 +1,24 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: prumo-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: prumo
+      POSTGRES_PASSWORD: prumo
+      POSTGRES_DB: prumo
+    ports:
+      # 5433 no host (5432 já está em uso por outro projeto); 5432 dentro do container
+      - "5433:5432"
+    volumes:
+      - prumo-pgdata:/var/lib/postgresql/data
+      # Roda o schema automaticamente na primeira inicialização do banco
+      - ./docs/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U prumo -d prumo"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  prumo-pgdata:

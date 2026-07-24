@@ -1,5 +1,5 @@
 // Controller de clientes (RF01–RF05).
-import { query } from '../config/db.js';
+import { query } from '../../config/db.js';
 
 const TIPOS_VALIDOS = ['consumidor_final', 'pedreiro', 'construtora', 'revenda'];
 

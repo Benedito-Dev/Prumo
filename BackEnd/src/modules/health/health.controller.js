@@ -1,6 +1,6 @@
 // Controller de health-check: confirma que a API está no ar
 // e que ela consegue conversar com o banco de dados.
-import { query } from '../config/db.js';
+import { query } from '../../config/db.js';
 
 export async function healthCheck(req, res) {
   try {

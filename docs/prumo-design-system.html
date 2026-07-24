@@ -1,0 +1,748 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prumo — Design System v0.1</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Archivo+Black&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  --concreto:#E6E9EB;
+  --concreto-fundo:#DDE1E4;
+  --superficie:#FFFFFF;
+  --grafite:#16191D;
+  --grafite-medio:#565D66;
+  --linha:#C7CDD1;
+  --trena:#FFC400;
+  --trena-escuro:#D9A500;
+  --nivel:#1B7A46;
+  --alerta:#C42E1E;
+
+  --ui:'Archivo',system-ui,-apple-system,sans-serif;
+  --display:'Archivo Black','Archivo',system-ui,sans-serif;
+
+  --r-p:6px;
+  --r-g:10px;
+
+  --toque:56px;
+  --toque-primario:64px;
+}
+
+*{box-sizing:border-box}
+
+body{
+  margin:0;
+  background:var(--concreto-fundo);
+  color:var(--grafite);
+  font-family:var(--ui);
+  font-size:16px;
+  line-height:1.55;
+  -webkit-font-smoothing:antialiased;
+}
+
+.pagina{max-width:1080px;margin:0 auto;padding:0 20px 100px}
+
+/* ---------- fio de prumo: elemento assinatura ---------- */
+.fio{
+  width:3px;
+  background:var(--grafite);
+  position:relative;
+  align-self:stretch;
+  flex:0 0 3px;
+}
+.fio::after{
+  content:'';
+  position:absolute;
+  left:50%;
+  bottom:-9px;
+  transform:translateX(-50%);
+  width:0;height:0;
+  border-left:6px solid transparent;
+  border-right:6px solid transparent;
+  border-top:10px solid var(--grafite);
+}
+.fio--claro{background:var(--superficie)}
+.fio--claro::after{border-top-color:var(--superficie)}
+
+/* ---------- cabeçalho ---------- */
+.capa{
+  background:var(--grafite);
+  color:var(--superficie);
+  margin:0 -20px 56px;
+  padding:64px 20px 56px;
+}
+.capa__interno{max-width:1040px;margin:0 auto;display:flex;gap:26px}
+.capa__marca{
+  font-family:var(--display);
+  font-size:clamp(52px,11vw,92px);
+  line-height:.92;
+  letter-spacing:-.02em;
+  margin:0;
+}
+.capa__linha{
+  font-size:17px;
+  color:#A8B0B8;
+  margin:14px 0 0;
+  max-width:48ch;
+}
+.capa__tag{
+  display:inline-block;
+  margin-top:24px;
+  background:var(--trena);
+  color:var(--grafite);
+  font-weight:700;
+  font-size:13px;
+  letter-spacing:.09em;
+  text-transform:uppercase;
+  padding:7px 14px;
+}
+
+/* ---------- seções ---------- */
+.secao{margin-bottom:64px}
+.secao__cabeca{display:flex;gap:16px;margin-bottom:28px}
+.secao__num{
+  font-family:var(--display);
+  font-size:13px;
+  color:var(--grafite-medio);
+  letter-spacing:.05em;
+}
+.secao__titulo{font-size:26px;font-weight:700;margin:2px 0 0;letter-spacing:-.01em}
+.secao__desc{color:var(--grafite-medio);margin:8px 0 0;max-width:62ch;font-size:15px}
+
+.bloco{
+  background:var(--superficie);
+  border:1px solid var(--linha);
+  border-radius:var(--r-g);
+  padding:26px;
+  margin-bottom:18px;
+}
+.bloco__rotulo{
+  font-size:12px;
+  font-weight:700;
+  letter-spacing:.1em;
+  text-transform:uppercase;
+  color:var(--grafite-medio);
+  margin:0 0 16px;
+}
+
+/* ---------- princípios ---------- */
+.principios{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:2px;background:var(--linha);border:1px solid var(--linha);border-radius:var(--r-g);overflow:hidden}
+.principio{background:var(--superficie);padding:24px}
+.principio h3{margin:0 0 8px;font-size:16px;font-weight:700}
+.principio p{margin:0;font-size:14.5px;color:var(--grafite-medio);line-height:1.5}
+
+/* ---------- cores ---------- */
+.cores{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px}
+.cor__amostra{height:96px;border-radius:var(--r-p);border:1px solid var(--linha)}
+.cor__nome{font-weight:700;margin:12px 0 2px;font-size:15px}
+.cor__hex{font-size:13px;color:var(--grafite-medio);font-variant-numeric:tabular-nums;letter-spacing:.03em}
+.cor__uso{font-size:13.5px;color:var(--grafite-medio);margin-top:6px;line-height:1.45}
+
+/* ---------- tipografia ---------- */
+.tipo-linha{display:flex;gap:24px;padding:20px 0;border-bottom:1px solid var(--linha);align-items:baseline;flex-wrap:wrap}
+.tipo-linha:last-child{border-bottom:none}
+.tipo-meta{flex:0 0 150px;font-size:12px;color:var(--grafite-medio);letter-spacing:.06em;text-transform:uppercase;font-weight:600}
+.t-numero{font-family:var(--display);font-size:44px;line-height:1;font-variant-numeric:tabular-nums}
+.t-display{font-family:var(--display);font-size:30px;line-height:1.1}
+.t-titulo{font-size:20px;font-weight:700}
+.t-corpo{font-size:17px}
+.t-dado{font-size:15px;font-weight:500;font-variant-numeric:tabular-nums}
+.t-rotulo{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--grafite-medio)}
+
+/* ---------- componentes ---------- */
+.demo{display:flex;flex-wrap:wrap;gap:14px;align-items:center}
+.demo--col{flex-direction:column;align-items:stretch;max-width:420px}
+
+.btn{
+  font-family:var(--ui);
+  font-size:17px;
+  font-weight:700;
+  border:none;
+  border-radius:var(--r-p);
+  min-height:var(--toque);
+  padding:0 24px;
+  cursor:pointer;
+  transition:transform .06s ease, background .12s ease;
+}
+.btn:active{transform:translateY(1px)}
+.btn:focus-visible{outline:3px solid var(--grafite);outline-offset:3px}
+
+.btn--primario{background:var(--trena);color:var(--grafite);min-height:var(--toque-primario);width:100%;font-size:19px;letter-spacing:.01em}
+.btn--primario:hover{background:var(--trena-escuro)}
+.btn--secundario{background:var(--superficie);color:var(--grafite);border:2px solid var(--grafite)}
+.btn--secundario:hover{background:var(--concreto)}
+.btn--texto{background:transparent;color:var(--grafite-medio);font-weight:600;text-decoration:underline;text-underline-offset:4px;padding:0 8px}
+.btn--perigo{background:var(--superficie);color:var(--alerta);border:2px solid var(--alerta)}
+
+.campo{display:block;margin-bottom:18px}
+.campo__rotulo{display:block;font-size:13px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--grafite-medio);margin-bottom:7px}
+.campo__entrada{
+  width:100%;
+  min-height:var(--toque);
+  border:2px solid var(--linha);
+  border-radius:var(--r-p);
+  padding:0 16px;
+  font-family:var(--ui);
+  font-size:19px;
+  font-weight:500;
+  color:var(--grafite);
+  background:var(--superficie);
+}
+.campo__entrada:focus{outline:none;border-color:var(--grafite)}
+.campo__entrada--numero{font-variant-numeric:tabular-nums;font-weight:700;text-align:right}
+.campo__ajuda{font-size:13.5px;color:var(--grafite-medio);margin-top:6px}
+.campo__erro{font-size:13.5px;color:var(--alerta);margin-top:6px;font-weight:600}
+.campo--erro .campo__entrada{border-color:var(--alerta)}
+
+/* cartão de indicador — o número pendura no fio */
+.kpi{
+  background:var(--superficie);
+  border:1px solid var(--linha);
+  border-radius:var(--r-g);
+  padding:20px;
+  display:flex;
+  gap:14px;
+}
+.kpi__corpo{flex:1;min-width:0}
+.kpi__rotulo{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--grafite-medio);margin:0}
+.kpi__valor{font-family:var(--display);font-size:38px;line-height:1.05;margin:8px 0 0;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.kpi__variacao{font-size:14px;font-weight:700;margin-top:6px;font-variant-numeric:tabular-nums}
+.kpi__variacao--sobe{color:var(--nivel)}
+.kpi__variacao--desce{color:var(--alerta)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}
+
+/* selos */
+.selo{
+  display:inline-flex;
+  align-items:center;
+  font-size:12px;
+  font-weight:700;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  padding:5px 10px;
+  border-radius:4px;
+}
+.selo--pago{background:#E2F1E9;color:var(--nivel)}
+.selo--fiado{
+  background:repeating-linear-gradient(-45deg,var(--trena),var(--trena) 7px,#EAB400 7px,#EAB400 14px);
+  color:var(--grafite);
+}
+.selo--vencido{background:#F8E3E1;color:var(--alerta)}
+.selo--sumido{background:var(--grafite);color:var(--superficie)}
+
+/* lista */
+.lista{border:1px solid var(--linha);border-radius:var(--r-g);overflow:hidden;background:var(--superficie);max-width:520px}
+.item{
+  display:flex;
+  align-items:center;
+  gap:14px;
+  padding:16px 18px;
+  min-height:var(--toque);
+  border-bottom:1px solid var(--linha);
+  cursor:pointer;
+}
+.item:last-child{border-bottom:none}
+.item:hover{background:var(--concreto)}
+.item__corpo{flex:1;min-width:0}
+.item__nome{font-size:17px;font-weight:600;margin:0}
+.item__meta{font-size:13.5px;color:var(--grafite-medio);margin:3px 0 0}
+.item__valor{font-family:var(--ui);font-weight:700;font-size:17px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.item__posicao{
+  font-family:var(--display);
+  font-size:15px;
+  color:var(--grafite-medio);
+  width:24px;
+  text-align:center;
+  font-variant-numeric:tabular-nums;
+}
+
+/* avisos */
+.aviso{display:flex;gap:14px;padding:18px;border-radius:var(--r-g);max-width:520px;align-items:flex-start}
+.aviso--atencao{background:#FFF6D9;border-left:5px solid var(--trena)}
+.aviso--erro{background:#F8E3E1;border-left:5px solid var(--alerta)}
+.aviso h4{margin:0 0 4px;font-size:15.5px;font-weight:700}
+.aviso p{margin:0;font-size:14.5px;color:var(--grafite-medio);line-height:1.5}
+
+/* vazio */
+.vazio{text-align:center;padding:44px 24px;border:2px dashed var(--linha);border-radius:var(--r-g);max-width:520px;background:var(--superficie)}
+.vazio h4{margin:0 0 6px;font-size:18px}
+.vazio p{margin:0 0 20px;color:var(--grafite-medio);font-size:15px}
+
+/* teclado numérico */
+.teclado{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;max-width:320px}
+.tecla{
+  min-height:var(--toque-primario);
+  border:1px solid var(--linha);
+  background:var(--superficie);
+  border-radius:var(--r-p);
+  font-family:var(--ui);
+  font-size:26px;
+  font-weight:600;
+  font-variant-numeric:tabular-nums;
+  cursor:pointer;
+  color:var(--grafite);
+}
+.tecla:active{background:var(--concreto)}
+.tecla:focus-visible{outline:3px solid var(--grafite);outline-offset:2px}
+
+/* alvo de toque */
+.alvo{display:flex;align-items:center;gap:16px;margin-bottom:12px}
+.alvo__caixa{background:var(--trena);border-radius:var(--r-p);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:var(--grafite);flex:0 0 auto;padding:0 18px}
+.alvo__texto{font-size:14.5px;color:var(--grafite-medio)}
+
+/* telas */
+.telas{display:flex;gap:34px;flex-wrap:wrap}
+.telefone{
+  width:342px;
+  border:9px solid var(--grafite);
+  border-radius:26px;
+  overflow:hidden;
+  background:var(--concreto);
+  flex:0 0 auto;
+}
+.tela__topo{background:var(--grafite);color:var(--superficie);padding:16px 18px;display:flex;justify-content:space-between;align-items:center}
+.tela__titulo{font-family:var(--display);font-size:19px;letter-spacing:-.01em}
+.tela__periodo{font-size:12.5px;color:#A8B0B8;font-weight:600}
+.tela__corpo{padding:16px;display:flex;flex-direction:column;gap:12px}
+.tela__legenda{text-align:center;font-size:13.5px;color:var(--grafite-medio);margin-top:14px;font-weight:600}
+
+.barra-nav{display:flex;background:var(--superficie);border-top:1px solid var(--linha)}
+.nav-item{flex:1;text-align:center;padding:12px 4px 14px;font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--grafite-medio)}
+.nav-item--ativo{color:var(--grafite);box-shadow:inset 0 3px 0 var(--trena)}
+
+.mini-titulo{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--grafite-medio);margin:6px 0 0}
+
+/* grafico de barras simples */
+.grafico{display:flex;align-items:flex-end;gap:6px;height:96px;padding-top:8px}
+.barra{flex:1;background:var(--linha);border-radius:2px 2px 0 0}
+.barra--destaque{background:var(--trena)}
+.grafico-eixo{display:flex;gap:6px;margin-top:6px}
+.grafico-eixo span{flex:1;text-align:center;font-size:10.5px;color:var(--grafite-medio);font-weight:600;text-transform:uppercase}
+
+.regras{margin:0;padding-left:22px}
+.regras li{margin-bottom:11px;font-size:15px;color:var(--grafite-medio);line-height:1.5}
+.regras strong{color:var(--grafite)}
+
+.rodape{border-top:1px solid var(--linha);padding-top:24px;color:var(--grafite-medio);font-size:14px}
+
+@media (max-width:640px){
+  .capa{padding:44px 20px 40px}
+  .tipo-meta{flex:0 0 100%}
+  .telefone{width:100%}
+}
+@media (prefers-reduced-motion:reduce){
+  *{transition:none!important;animation:none!important}
+}
+</style>
+
+<div class="capa">
+  <div class="capa__interno">
+    <div class="fio fio--claro"></div>
+    <div>
+      <h1 class="capa__marca">PRUMO</h1>
+      <p class="capa__linha">Design system v0.1 — o sistema de gestão para depósito de material de construção. Feito para quem atende em pé, no balcão, com o cliente esperando.</p>
+      <span class="capa__tag">Seu depósito no prumo</span>
+    </div>
+  </div>
+</div>
+
+<div class="pagina">
+
+  <section class="secao">
+    <div class="secao__cabeca">
+      <div class="fio"></div>
+      <div>
+        <div class="secao__num">01</div>
+        <h2 class="secao__titulo">Princípios</h2>
+        <p class="secao__desc">Quatro regras que decidem qualquer dúvida de design. Quando duas se contradizerem, vale a primeira.</p>
+      </div>
+    </div>
+
+    <div class="principios">
+      <div class="principio">
+        <h3>Mais rápido que o caderno</h3>
+        <p>Se lançar a venda demorar mais que rabiscar no papel, o sistema perdeu. Toda tela nova é cronometrada antes de entrar.</p>
+      </div>
+      <div class="principio">
+        <h3>Legível na claridade</h3>
+        <p>O balcão é aberto e o sol bate na tela. Contraste alto, texto a partir de 17px, nada de cinza claro sobre branco.</p>
+      </div>
+      <div class="principio">
+        <h3>Dedo grosso, mão suja</h3>
+        <p>Nenhum alvo de toque abaixo de 56px. A ação principal tem 64px e ocupa a largura toda.</p>
+      </div>
+      <div class="principio">
+        <h3>Um número por vez</h3>
+        <p>Cada tela responde a uma pergunta. Painel cheio de gráfico não informa: distrai.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="secao">
+    <div class="secao__cabeca">
+      <div class="fio"></div>
+      <div>
+        <div class="secao__num">02</div>
+        <h2 class="secao__titulo">Cor</h2>
+        <p class="secao__desc">Base de concreto, estrutura em grafite e um único sinal: o amarelo de trena. O amarelo marca ação — nunca decora. Se aparecer em dois lugares na mesma tela, um dos dois está errado.</p>
+      </div>
+    </div>
+
+    <div class="bloco">
+      <div class="cores">
+        <div>
+          <div class="cor__amostra" style="background:#E6E9EB"></div>
+          <p class="cor__nome">Concreto</p>
+          <div class="cor__hex">#E6E9EB</div>
+          <p class="cor__uso">Fundo das telas. Cinza frio de cimento curado, não bege.</p>
+        </div>
+        <div>
+          <div class="cor__amostra" style="background:#FFFFFF"></div>
+          <p class="cor__nome">Superfície</p>
+          <div class="cor__hex">#FFFFFF</div>
+          <p class="cor__uso">Cartões, listas e campos. Tudo que recebe conteúdo.</p>
+        </div>
+        <div>
+          <div class="cor__amostra" style="background:#16191D"></div>
+          <p class="cor__nome">Grafite</p>
+          <div class="cor__hex">#16191D</div>
+          <p class="cor__uso">Texto, fio de prumo, cabeçalhos e bordas de ênfase.</p>
+        </div>
+        <div>
+          <div class="cor__amostra" style="background:#FFC400"></div>
+          <p class="cor__nome">Amarelo trena</p>
+          <div class="cor__hex">#FFC400</div>
+          <p class="cor__uso">Só a ação principal e o item ativo. Sempre com texto grafite por cima.</p>
+        </div>
+        <div>
+          <div class="cor__amostra" style="background:#1B7A46"></div>
+          <p class="cor__nome">Verde nível</p>
+          <div class="cor__hex">#1B7A46</div>
+          <p class="cor__uso">Crescimento, pagamento confirmado, venda concluída.</p>
+        </div>
+        <div>
+          <div class="cor__amostra" style="background:#C42E1E"></div>
+          <p class="cor__nome">Vermelho prumo</p>
+          <div class="cor__hex">#C42E1E</div>
+          <p class="cor__uso">Queda, erro de preenchimento e conta vencida.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="secao">
+    <div class="secao__cabeca">
+      <div class="fio"></div>
+      <div>
+        <div class="secao__num">03</div>
+        <h2 class="secao__titulo">Tipografia</h2>
+        <p class="secao__desc">Archivo Black para números e marca — pesada e larga, como letra estampada em saco de cimento. Archivo para todo o resto. Números sempre com dígito de largura fixa, para a coluna de dinheiro nunca dançar.</p>
+      </div>
+    </div>
+
+    <div class="bloco">
+      <div class="tipo-linha"><div class="tipo-meta">Número · Black 44</div><div class="t-numero">R$ 48.230</div></div>
+      <div class="tipo-linha"><div class="tipo-meta">Display · Black 30</div><div class="t-display">Painel do mês</div></div>
+      <div class="tipo-linha"><div class="tipo-meta">Título · 20/700</div><div class="t-titulo">Clientes que mais compraram</div></div>
+      <div class="tipo-linha"><div class="tipo-meta">Corpo · 17/400</div><div class="t-corpo">Este cliente comprou 12 vezes nos últimos 6 meses.</div></div>
+      <div class="tipo-linha"><div class="tipo-meta">Dado · 15/500</div><div class="t-dado">40 sacos · R$ 1.480,00 · 14/07/2026</div></div>
+      <div class="tipo-linha"><div class="tipo-meta">Rótulo · 12/700</div><div class="t-rotulo">Faturamento do mês</div></div>
+    </div>
+  </section>
+
+  <section class="secao">
+    <div class="secao__cabeca">
+      <div class="fio"></div>
+      <div>
+        <div class="secao__num">04</div>
+        <h2 class="secao__titulo">Toque e espaço</h2>
+        <p class="secao__desc">A régua de espaçamento é múltipla de 4. Os alvos de toque são maiores que o padrão da indústria de propósito: a mão que usa o Prumo está segurando outra coisa.</p>
+      </div>
+    </div>
+
+    <div class="bloco">
+      <div class="alvo"><div class="alvo__caixa" style="height:64px">64px</div><div class="alvo__texto"><strong>Ação principal.</strong> Salvar venda, adicionar item. Largura total da tela.</div></div>
+      <div class="alvo"><div class="alvo__caixa" style="height:56px">56px</div><div class="alvo__texto"><strong>Mínimo absoluto.</strong> Botões, campos, linhas de lista e teclas.</div></div>
+      <div class="alvo"><div class="alvo__caixa" style="height:44px">44px</div><div class="alvo__texto"><strong>Proibido.</strong> Padrão comum de mercado, pequeno demais para este contexto.</div></div>
+    </div>
+  </section>
+
+  <section class="secao">
+    <div class="secao__cabeca">
+      <div class="fio"></div>
+      <div>
+        <div class="secao__num">05</div>
+        <h2 class="secao__titulo">Componentes</h2>
+        <p class="secao__desc">O básico do sistema. Os textos são parte do componente: cada botão diz exatamente o que acontece ao ser tocado, e o nome da ação não muda no meio do caminho.</p>
+      </div>
+    </div>
+
+    <div class="bloco">
+      <p class="bloco__rotulo">Botões</p>
+      <div class="demo demo--col">
+        <button class="btn btn--primario">Salvar venda</button>
+      </div>
+      <div class="demo" style="margin-top:14px">
+        <button class="btn btn--secundario">Adicionar item</button>
+        <button class="btn btn--perigo">Cancelar venda</button>
+        <button class="btn btn--texto">Ver histórico completo</button>
+      </div>
+    </div>
+
+    <div class="bloco">
+      <p class="bloco__rotulo">Campos</p>
+      <div style="max-width:420px">
+        <label class="campo">
+          <span class="campo__rotulo">Cliente</span>
+          <input class="campo__entrada" value="José Ferreira — pedreiro">
+          <span class="campo__ajuda">Digite o nome ou o telefone para buscar.</span>
+        </label>
+        <label class="campo">
+          <span class="campo__rotulo">Quantidade (sacos)</span>
+          <input class="campo__entrada campo__entrada--numero" value="40">
+        </label>
+        <label class="campo campo--erro">
+          <span class="campo__rotulo">Preço unitário</span>
+          <input class="campo__entrada campo__entrada--numero" value="0,00">
+          <span class="campo__erro">Informe um preço maior que zero.</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="bloco">
+      <p class="bloco__rotulo">Teclado numérico</p>
+      <p class="campo__ajuda" style="margin:-8px 0 16px">Quantidade e preço abrem este teclado, nunca o teclado do celular. Tecla de 64px, sem letra no meio.</p>
+      <div class="teclado">
+        <button class="tecla">1</button><button class="tecla">2</button><button class="tecla">3</button>
+        <button class="tecla">4</button><button class="tecla">5</button><button class="tecla">6</button>
+        <button class="tecla">7</button><button class="tecla">8</button><button class="tecla">9</button>
+        <button class="tecla">,</button><button class="tecla">0</button><button class="tecla">←</button>
+      </div>
+    </div>
+
+    <div class="bloco">
+      <p class="bloco__rotulo">Cartão de indicador</p>
+      <div class="kpis">
+        <div class="kpi">
+          <div class="fio"></div>
+          <div class="kpi__corpo">
+            <p class="kpi__rotulo">Faturamento · julho</p>
+            <p class="kpi__valor">R$ 48.230</p>
+            <p class="kpi__variacao kpi__variacao--sobe">↑ 12% sobre junho</p>
+          </div>
+        </div>
+        <div class="kpi">
+          <div class="fio"></div>
+          <div class="kpi__corpo">
+            <p class="kpi__rotulo">Ticket médio</p>
+            <p class="kpi__valor">R$ 386</p>
+            <p class="kpi__variacao kpi__variacao--desce">↓ 4% sobre junho</p>
+          </div>
+        </div>
+        <div class="kpi">
+          <div class="fio"></div>
+          <div class="kpi__corpo">
+            <p class="kpi__rotulo">Vendas no mês</p>
+            <p class="kpi__valor">125</p>
+            <p class="kpi__variacao kpi__variacao--sobe">↑ 9 vendas</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="bloco">
+      <p class="bloco__rotulo">Selos de situação</p>
+      <div class="demo">
+        <span class="selo selo--pago">Pago</span>
+        <span class="selo selo--fiado">Fiado</span>
+        <span class="selo selo--vencido">Vencido</span>
+        <span class="selo selo--sumido">Sumido</span>
+      </div>
+      <p class="campo__ajuda" style="margin-top:14px">O fiado usa listra diagonal, como fita de sinalização de obra: reconhecível de relance, sem precisar ler.</p>
+    </div>
+
+    <div class="bloco">
+      <p class="bloco__rotulo">Lista de ranking</p>
+      <div class="lista">
+        <div class="item">
+          <span class="item__posicao">1</span>
+          <div class="item__corpo"><p class="item__nome">Construtora Vale Verde</p><p class="item__meta">8 compras · última em 21/07</p></div>
+          <span class="item__valor">R$ 9.840</span>
+        </div>
+        <div class="item">
+          <span class="item__posicao">2</span>
+          <div class="item__corpo"><p class="item__nome">José Ferreira</p><p class="item__meta">14 compras · última em 23/07</p></div>
+          <span class="item__valor">R$ 6.215</span>
+        </div>
+        <div class="item">
+          <span class="item__posicao">3</span>
+          <div class="item__corpo"><p class="item__nome">Marcos Andrade</p><p class="item__meta">5 compras · última em 18/07</p></div>
+          <span class="item__valor">R$ 4.070</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="bloco">
+      <p class="bloco__rotulo">Avisos</p>
+      <div class="aviso aviso--atencao" style="margin-bottom:14px">
+        <div>
+          <h4>José Ferreira está sumido</h4>
+          <p>Comprava a cada 9 dias, em média. Faz 26 dias que não aparece.</p>
+        </div>
+      </div>
+      <div class="aviso aviso--erro">
+        <div>
+          <h4>A venda não foi salva</h4>
+          <p>Sem internet no momento. Ela fica guardada no aparelho e sobe sozinha quando a conexão voltar.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="bloco">
+      <p class="bloco__rotulo">Estado vazio</p>
+      <div class="vazio">
+        <h4>Nenhuma venda hoje</h4>
+        <p>Lance a primeira venda do dia e os números do painel começam a aparecer.</p>
+        <button class="btn btn--primario" style="max-width:280px;margin:0 auto">Nova venda</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="secao">
+    <div class="secao__cabeca">
+      <div class="fio"></div>
+      <div>
+        <div class="secao__num">06</div>
+        <h2 class="secao__titulo">Telas</h2>
+        <p class="secao__desc">As duas telas que definem o produto. O painel é o que ele quer ver; a nova venda é o que sustenta o painel.</p>
+      </div>
+    </div>
+
+    <div class="telas">
+      <div>
+        <div class="telefone">
+          <div class="tela__topo">
+            <span class="tela__titulo">PRUMO</span>
+            <span class="tela__periodo">JULHO 2026</span>
+          </div>
+          <div class="tela__corpo">
+            <div class="kpi">
+              <div class="fio"></div>
+              <div class="kpi__corpo">
+                <p class="kpi__rotulo">Faturamento do mês</p>
+                <p class="kpi__valor">R$ 48.230</p>
+                <p class="kpi__variacao kpi__variacao--sobe">↑ 12% sobre junho</p>
+              </div>
+            </div>
+
+            <div style="background:#fff;border:1px solid var(--linha);border-radius:10px;padding:16px">
+              <p class="mini-titulo">Últimos 6 meses</p>
+              <div class="grafico">
+                <div class="barra" style="height:46%"></div>
+                <div class="barra" style="height:58%"></div>
+                <div class="barra" style="height:52%"></div>
+                <div class="barra" style="height:71%"></div>
+                <div class="barra" style="height:64%"></div>
+                <div class="barra barra--destaque" style="height:88%"></div>
+              </div>
+              <div class="grafico-eixo"><span>fev</span><span>mar</span><span>abr</span><span>mai</span><span>jun</span><span>jul</span></div>
+            </div>
+
+            <div class="aviso aviso--atencao">
+              <div>
+                <h4>2 clientes sumidos</h4>
+                <p>Costumavam comprar toda semana.</p>
+              </div>
+            </div>
+
+            <div class="lista" style="max-width:none">
+              <div class="item"><span class="item__posicao">1</span><div class="item__corpo"><p class="item__nome">Vale Verde</p><p class="item__meta">8 compras</p></div><span class="item__valor">R$ 9.840</span></div>
+              <div class="item"><span class="item__posicao">2</span><div class="item__corpo"><p class="item__nome">José Ferreira</p><p class="item__meta">14 compras</p></div><span class="item__valor">R$ 6.215</span></div>
+            </div>
+
+            <button class="btn btn--primario">Nova venda</button>
+          </div>
+          <div class="barra-nav">
+            <div class="nav-item nav-item--ativo">Painel</div>
+            <div class="nav-item">Vendas</div>
+            <div class="nav-item">Clientes</div>
+            <div class="nav-item">Produtos</div>
+          </div>
+        </div>
+        <p class="tela__legenda">Painel — abre direto no faturamento</p>
+      </div>
+
+      <div>
+        <div class="telefone">
+          <div class="tela__topo">
+            <span class="tela__titulo">NOVA VENDA</span>
+            <span class="tela__periodo">24/07</span>
+          </div>
+          <div class="tela__corpo">
+            <label class="campo" style="margin-bottom:6px">
+              <span class="campo__rotulo">Cliente</span>
+              <input class="campo__entrada" value="José Ferreira">
+            </label>
+
+            <div class="lista" style="max-width:none">
+              <div class="item">
+                <div class="item__corpo"><p class="item__nome">Cimento CP-II 50kg</p><p class="item__meta">40 sacos × R$ 37,00</p></div>
+                <span class="item__valor">R$ 1.480</span>
+              </div>
+              <div class="item">
+                <div class="item__corpo"><p class="item__nome">Areia média</p><p class="item__meta">2 m³ × R$ 120,00</p></div>
+                <span class="item__valor">R$ 240</span>
+              </div>
+            </div>
+
+            <button class="btn btn--secundario">Adicionar item</button>
+
+            <div class="kpi">
+              <div class="fio"></div>
+              <div class="kpi__corpo">
+                <p class="kpi__rotulo">Total</p>
+                <p class="kpi__valor">R$ 1.720</p>
+              </div>
+            </div>
+
+            <div class="demo">
+              <span class="selo selo--pago">À vista</span>
+              <span class="selo selo--fiado">Fiado</span>
+            </div>
+
+            <button class="btn btn--primario">Salvar venda</button>
+          </div>
+        </div>
+        <p class="tela__legenda">Nova venda — meta de 30 segundos</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="secao">
+    <div class="secao__cabeca">
+      <div class="fio"></div>
+      <div>
+        <div class="secao__num">07</div>
+        <h2 class="secao__titulo">Regras de aplicação</h2>
+        <p class="secao__desc">O que não pode ser negociado quando o sistema crescer.</p>
+      </div>
+    </div>
+
+    <div class="bloco">
+      <ul class="regras">
+        <li><strong>Uma ação amarela por tela.</strong> O amarelo é o caminho a seguir. Dois amarelos criam dúvida.</li>
+        <li><strong>Dinheiro nunca em cinza claro.</strong> Valor é sempre grafite, peso 700, dígito de largura fixa.</li>
+        <li><strong>Verde e vermelho nunca sozinhos.</strong> Toda variação leva também a seta e o texto, para quem não distingue as duas cores.</li>
+        <li><strong>O fio de prumo marca hierarquia, não enfeite.</strong> Ele aparece no cabeçalho de seção e no cartão de indicador — em mais nada.</li>
+        <li><strong>Nada de ícone sem rótulo.</strong> Ícone sozinho obriga a decorar. A barra inferior sempre traz a palavra.</li>
+        <li><strong>Foco sempre visível.</strong> Contorno grafite de 3px, para uso com teclado no computador do escritório.</li>
+        <li><strong>Confirmação só para o irreversível.</strong> Cancelar venda pergunta; salvar venda, não.</li>
+      </ul>
+    </div>
+  </section>
+
+  <div class="rodape">
+    Prumo · Design system v0.1 · 24/07/2026 — evolui junto com o documento de requisitos.
+  </div>
+
+</div>

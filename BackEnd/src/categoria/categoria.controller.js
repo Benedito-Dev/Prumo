@@ -1,5 +1,5 @@
 // Controller de categorias (RF09).
-import { query } from '../../config/db.js';
+import { query } from '../config/db.js';
 
 // GET /api/categorias
 export async function listarCategorias(req, res) {

@@ -1,5 +1,5 @@
 // Controller de produtos (RF06–RF09).
-import { query } from '../../config/db.js';
+import { query } from '../config/db.js';
 
 const UNIDADES_VALIDAS = ['saco', 'milheiro', 'm3', 'peca', 'barra', 'kg', 'metro', 'carrada'];
 

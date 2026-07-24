@@ -2,7 +2,7 @@
 // Objetivo agora: ter vendedores no banco para vincular às vendas.
 // Login/autenticação completa vem numa fase posterior.
 import bcrypt from 'bcryptjs';
-import { query } from '../../config/db.js';
+import { query } from '../config/db.js';
 
 const PAPEIS_VALIDOS = ['dono', 'vendedor', 'caixa', 'estoque'];
 

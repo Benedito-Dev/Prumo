@@ -2,7 +2,7 @@
 // Separado do server.js para facilitar testes futuros.
 import express from 'express';
 import cors from 'cors';
-import routes from './modules/index.js';
+import routes from './routes.js';
 
 const app = express();
 

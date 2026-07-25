@@ -7,6 +7,7 @@ import categoriaRoutes from './categoria/categoria.routes.js';
 import produtoRoutes from './produto/produto.routes.js';
 import usuarioRoutes from './usuario/usuario.routes.js';
 import vendaRoutes from './venda/venda.routes.js';
+import painelRoutes from './painel/painel.routes.js';
 
 const router = Router();
 
@@ -16,5 +17,6 @@ router.use('/categorias', categoriaRoutes);
 router.use('/produtos', produtoRoutes);
 router.use('/usuarios', usuarioRoutes);
 router.use('/vendas', vendaRoutes);
+router.use('/painel', painelRoutes);
 
 export default router;

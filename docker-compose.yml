@@ -20,5 +20,44 @@ services:
       timeout: 5s
       retries: 5
 
+  api:
+    build:
+      context: ./BackEnd
+      dockerfile: Dockerfile.dev
+    container_name: prumo-api
+    restart: unless-stopped
+    environment:
+      PORT: 3333
+      # Dentro da rede do compose o banco é 'db:5432', não localhost:5433
+      DATABASE_URL: postgresql://prumo:prumo@db:5432/prumo
+    ports:
+      - "3333:3333"
+    volumes:
+      - ./BackEnd:/app
+      # volume anônimo protege o node_modules do container do bind mount acima
+      - /app/node_modules
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ./FrontEnd
+      dockerfile: Dockerfile.dev
+    container_name: prumo-web
+    restart: unless-stopped
+    environment:
+      # polling garante o hot-reload em volumes montados no Windows
+      CHOKIDAR_USEPOLLING: "true"
+      # dentro da rede do compose, a API é o serviço 'api'
+      VITE_API_TARGET: http://api:3333
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./FrontEnd:/app
+      - /app/node_modules
+    depends_on:
+      - api
+
 volumes:
   prumo-pgdata:

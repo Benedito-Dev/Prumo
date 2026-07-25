@@ -7,9 +7,11 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
     port: 5173,
-    // Encaminha /api para o back-end, evitando CORS no desenvolvimento
+    host: true, // acessível fora do container
+    // Encaminha /api para o back-end, evitando CORS no desenvolvimento.
+    // Em container o alvo é o serviço 'api'; fora dele, localhost.
     proxy: {
-      '/api': 'http://localhost:3333',
+      '/api': process.env.VITE_API_TARGET || 'http://localhost:3333',
     },
   },
 })

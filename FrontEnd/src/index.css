@@ -1,0 +1,33 @@
+@import 'tailwindcss';
+
+@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Archivo+Black&display=swap');
+
+/* ---------- Design System do Prumo (tokens) ---------- */
+/* Fonte da verdade: docs/prumo-design-system.html */
+@theme {
+  --color-concreto: #e6e9eb;
+  --color-concreto-fundo: #dde1e4;
+  --color-superficie: #ffffff;
+  --color-grafite: #16191d;
+  --color-grafite-medio: #565d66;
+  --color-linha: #c7cdd1;
+  --color-trena: #ffc400;
+  --color-trena-escuro: #d9a500;
+  --color-nivel: #1b7a46;
+  --color-prumo: #c42e1e; /* vermelho prumo — cor assinatura */
+
+  --font-ui: 'Archivo', system-ui, -apple-system, sans-serif;
+  --font-display: 'Archivo Black', 'Archivo', system-ui, sans-serif;
+
+  --radius-p: 6px;
+  --radius-g: 10px;
+}
+
+/* ---------- Base ---------- */
+body {
+  margin: 0;
+  background: var(--color-concreto-fundo);
+  color: var(--color-grafite);
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+}

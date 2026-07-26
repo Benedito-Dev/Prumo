@@ -2,14 +2,17 @@
 // Separado do server.js para facilitar testes futuros.
 import express from 'express';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import swaggerUi from 'swagger-ui-express';
 import routes from './routes.js';
 import { openapiSpec } from './docs/openapi.js';
 
 const app = express();
 
-app.use(cors());
+// credentials:true permite o cookie httpOnly do refresh trafegar
+app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
+app.use(cookieParser());
 
 // Documentação interativa (Swagger UI) em /api/docs
 app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(openapiSpec, {

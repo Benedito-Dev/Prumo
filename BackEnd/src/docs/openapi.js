@@ -204,6 +204,7 @@ export const openapiSpec = {
   servers: [{ url: '/api', description: 'API do Prumo' }],
   tags: [
     { name: 'Health', description: 'Status da API e do banco' },
+    { name: 'Auth', description: 'Autenticação — login, refresh, logout' },
     { name: 'Clientes', description: 'Cadastro de clientes (RF01–RF05)' },
     { name: 'Categorias', description: 'Categorias de produtos (RF09)' },
     { name: 'Produtos', description: 'Catálogo de produtos (RF06–RF09)' },
@@ -211,8 +212,72 @@ export const openapiSpec = {
     { name: 'Vendas', description: 'Registro de vendas — o núcleo (RF10–RF14)' },
     { name: 'Painel', description: 'Indicadores do painel (RF16–RF22)' },
   ],
-  components: { schemas },
+  components: {
+    schemas,
+    securitySchemes: {
+      bearerAuth: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
+    },
+  },
   paths: {
+    // ---------------- AUTH ----------------
+    '/auth/login': {
+      post: {
+        tags: ['Auth'],
+        summary: 'Login (bcrypt) — retorna access token e seta refresh (cookie httpOnly)',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['login', 'senha'],
+                properties: {
+                  login: { type: 'string', example: 'benedito' },
+                  senha: { type: 'string', format: 'password', example: '123456' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: ok({
+            type: 'object',
+            properties: {
+              accessToken: { type: 'string' },
+              usuario: ref('Usuario'),
+            },
+          }, 'Autenticado'),
+          401: erro('Login ou senha inválidos'),
+          403: erro('Usuário inativo'),
+        },
+      },
+    },
+    '/auth/refresh': {
+      post: {
+        tags: ['Auth'],
+        summary: 'Renova o access token (rotaciona o refresh do cookie)',
+        responses: {
+          200: ok({ type: 'object', properties: { accessToken: { type: 'string' } } }),
+          401: erro('Refresh inválido/expirado ou sessão encerrada'),
+        },
+      },
+    },
+    '/auth/logout': {
+      post: {
+        tags: ['Auth'],
+        summary: 'Encerra a sessão (revoga o refresh no banco)',
+        responses: { 200: ok({ type: 'object' }) },
+      },
+    },
+    '/auth/me': {
+      get: {
+        tags: ['Auth'],
+        summary: 'Usuário do access token atual (requer Bearer)',
+        security: [{ bearerAuth: [] }],
+        responses: { 200: ok(ref('Usuario')), 401: erro('Token ausente/inválido') },
+      },
+    },
+
     // ---------------- HEALTH ----------------
     '/health': {
       get: {

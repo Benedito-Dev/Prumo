@@ -113,6 +113,22 @@ CREATE INDEX idx_item_venda_produto ON item_venda (produto_id);
 
 
 -- ============================================================
+--  REFRESH_TOKEN — sessões ativas para renovar o access token
+--  Persistir permite revogar (logout real) e rotacionar o refresh.
+--  jti casa com o claim do JWT; revogado marca o fim da sessão.
+-- ============================================================
+CREATE TABLE refresh_token (
+    jti          UUID          PRIMARY KEY,              -- id único do token (claim jti)
+    usuario_id   UUID          NOT NULL REFERENCES usuario (id) ON DELETE CASCADE,
+    expira_em    TIMESTAMP     NOT NULL,
+    revogado     BOOLEAN       NOT NULL DEFAULT FALSE,
+    criado_em    TIMESTAMP     NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_refresh_usuario ON refresh_token (usuario_id);
+
+
+-- ============================================================
 --  FIM DO SCHEMA v0.1
 --  Fora do escopo (fases futuras): estoque, movimento_estoque,
 --  entrada_mercadoria, conta_cliente (fiado), previsao, log_auditoria.

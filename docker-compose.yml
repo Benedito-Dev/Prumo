@@ -30,6 +30,11 @@ services:
       PORT: 3000
       # Dentro da rede do compose o banco é 'db:5432', não localhost:5433
       DATABASE_URL: postgresql://prumo:prumo@db:5432/prumo
+      NODE_ENV: development
+      JWT_ACCESS_SECRET: dev-access-secret-prumo-troque-em-producao
+      JWT_REFRESH_SECRET: dev-refresh-secret-prumo-troque-em-producao
+      ACCESS_TOKEN_TTL: 15m
+      REFRESH_TOKEN_TTL_DIAS: 7
     ports:
       - "3000:3000"
     volumes:

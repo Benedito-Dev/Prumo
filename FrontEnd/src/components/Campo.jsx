@@ -20,7 +20,10 @@ export default function Campo({
         className={`w-full min-h-[56px] rounded-p px-4 bg-superficie
           font-ui text-[19px] font-medium text-grafite
           border-2 ${erro ? 'border-prumo' : 'border-linha'}
-          focus:outline-none focus:border-grafite
+          transition-[border-color,box-shadow] duration-150
+          focus:outline-none focus:border-grafite focus:shadow-[0_0_0_4px_rgba(22,25,29,0.08)]
+          placeholder:text-grafite-medio/50 placeholder:font-normal
+          [&:-webkit-autofill]:shadow-[inset_0_0_0_100px_#fff]
           ${numero ? 'text-right tabular-nums font-bold' : ''}`}
         {...props}
       />

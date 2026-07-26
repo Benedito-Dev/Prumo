@@ -6,4 +6,5 @@ export { default as Kpi } from './Kpi';
 export { default as Selo } from './Selo';
 export { default as Aviso } from './Aviso';
 export { default as EstadoVazio } from './EstadoVazio';
+export { default as GraficoBarras } from './GraficoBarras';
 export { Lista, Item } from './Lista';

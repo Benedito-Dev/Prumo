@@ -1,6 +1,6 @@
 import { Routes, Route } from 'react-router-dom';
 import Login from './pages/Login';
-import Home from './pages/Home';
+import Painel from './pages/Painel';
 import RotaProtegida from './auth/RotaProtegida';
 
 export default function App() {
@@ -11,7 +11,7 @@ export default function App() {
         path="/"
         element={
           <RotaProtegida>
-            <Home />
+            <Painel />
           </RotaProtegida>
         }
       />

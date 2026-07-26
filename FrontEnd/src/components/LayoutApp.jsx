@@ -14,8 +14,8 @@ export default function LayoutApp({ titulo, periodo, children }) {
   const { usuario, sair } = useAuth();
   const navigate = useNavigate();
 
-  function aoSair() {
-    sair();
+  async function aoSair() {
+    await sair();
     navigate('/login', { replace: true });
   }
 

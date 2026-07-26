@@ -1,28 +1,67 @@
-// Contexto de autenticação (versão visual/protótipo).
-// Guarda o usuário logado e persiste em localStorage para sobreviver ao reload.
-// NOTA: ainda não valida senha nem usa token — isso entra na fase de auth real.
-import { createContext, useContext, useEffect, useState } from 'react';
+// Contexto de autenticação (real).
+// O access token vive em memória (no api.js). O refresh é um cookie
+// httpOnly que o navegador guarda. Ao carregar o app, tentamos /refresh
+// para restaurar a sessão sem novo login.
+import { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { api, definirAccessToken, registrarLogout } from '../services/api';
 
 const AuthContext = createContext(null);
 
-const CHAVE = 'prumo.usuario';
-
 export function AuthProvider({ children }) {
-  const [usuario, setUsuario] = useState(() => {
-    const salvo = localStorage.getItem(CHAVE);
-    return salvo ? JSON.parse(salvo) : null;
-  });
+  const [usuario, setUsuario] = useState(null);
+  const [carregando, setCarregando] = useState(true); // enquanto restaura a sessão
 
+  const sair = useCallback(async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+    } catch {
+      // segue mesmo se falhar
+    }
+    definirAccessToken(null);
+    setUsuario(null);
+  }, []);
+
+  // Registra o callback de logout usado pelo api.js quando o refresh falha
   useEffect(() => {
-    if (usuario) localStorage.setItem(CHAVE, JSON.stringify(usuario));
-    else localStorage.removeItem(CHAVE);
-  }, [usuario]);
+    registrarLogout(() => {
+      definirAccessToken(null);
+      setUsuario(null);
+    });
+  }, []);
 
-  const entrar = (dadosUsuario) => setUsuario(dadosUsuario);
-  const sair = () => setUsuario(null);
+  // Ao montar: tenta restaurar a sessão via cookie de refresh
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await fetch('/api/auth/refresh', {
+          method: 'POST',
+          credentials: 'include',
+        });
+        if (r.ok) {
+          const dados = await r.json();
+          definirAccessToken(dados.accessToken);
+          setUsuario(dados.usuario);
+        }
+      } catch {
+        // sem sessão — segue deslogado
+      } finally {
+        setCarregando(false);
+      }
+    })();
+  }, []);
+
+  // login: recebe credenciais, guarda o access em memória e o usuário
+  const entrar = useCallback(async (login, senha) => {
+    const dados = await api.post('/auth/login', { login, senha });
+    definirAccessToken(dados.accessToken);
+    setUsuario(dados.usuario);
+    return dados.usuario;
+  }, []);
 
   return (
-    <AuthContext.Provider value={{ usuario, entrar, sair, autenticado: !!usuario }}>
+    <AuthContext.Provider
+      value={{ usuario, carregando, entrar, sair, autenticado: !!usuario }}
+    >
       {children}
     </AuthContext.Provider>
   );

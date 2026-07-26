@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api } from '../services/api';
 import { useAuth } from '../auth/AuthContext';
 import { Botao, Campo } from '../components';
 
@@ -38,22 +37,11 @@ export default function Login() {
 
     setCarregando(true);
     try {
-      const usuarios = await api.get('/usuarios');
-      const usuario = usuarios.find((u) => u.login === login.trim());
-
-      if (!usuario) {
-        setErro('Usuário não encontrado.');
-        return;
-      }
-      if (!usuario.ativo) {
-        setErro('Este usuário está inativo.');
-        return;
-      }
-
-      entrar(usuario);
+      await entrar(login.trim(), senha);
       navigate('/', { replace: true });
-    } catch {
-      setErro('Não foi possível conectar. O sistema está no ar?');
+    } catch (e) {
+      // mensagem vinda da API (401/403) ou fallback de conexão
+      setErro(e.message === 'Sessão expirada' ? 'Login ou senha inválidos.' : e.message);
     } finally {
       setCarregando(false);
     }

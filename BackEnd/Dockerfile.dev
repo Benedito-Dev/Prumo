@@ -9,6 +9,6 @@ COPY package*.json ./
 RUN npm install
 
 # O código real vem por volume (bind mount) no docker-compose.
-EXPOSE 3333
+EXPOSE 3000
 
 CMD ["npm", "run", "dev"]

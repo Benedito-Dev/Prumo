@@ -13,7 +13,7 @@
 CREATE TABLE usuario (
     id           UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
     nome         VARCHAR(120) NOT NULL,
-    login        VARCHAR(60)  NOT NULL UNIQUE,
+    email        VARCHAR(160) NOT NULL UNIQUE,
     senha_hash   VARCHAR(255) NOT NULL,
     papel        VARCHAR(20)  NOT NULL DEFAULT 'dono'
                  CHECK (papel IN ('dono', 'vendedor', 'caixa', 'estoque')),

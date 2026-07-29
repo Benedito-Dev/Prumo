@@ -91,7 +91,7 @@ const schemas = {
     properties: {
       id: { type: 'string', format: 'uuid' },
       nome: { type: 'string', example: 'Benedito' },
-      login: { type: 'string', example: 'benedito' },
+      email: { type: 'string', format: 'email', example: 'benedito@prumo.com' },
       papel: { type: 'string', enum: ['dono', 'vendedor', 'caixa', 'estoque'] },
       ativo: { type: 'boolean' },
       criado_em: { type: 'string', format: 'date-time' },
@@ -99,10 +99,10 @@ const schemas = {
   },
   UsuarioEntrada: {
     type: 'object',
-    required: ['nome', 'login', 'senha'],
+    required: ['nome', 'email', 'senha'],
     properties: {
       nome: { type: 'string', example: 'Benedito' },
-      login: { type: 'string', example: 'benedito' },
+      email: { type: 'string', format: 'email', example: 'benedito@prumo.com' },
       senha: { type: 'string', format: 'password', example: 'segredo123' },
       papel: { type: 'string', enum: ['dono', 'vendedor', 'caixa', 'estoque'] },
     },
@@ -230,9 +230,9 @@ export const openapiSpec = {
             'application/json': {
               schema: {
                 type: 'object',
-                required: ['login', 'senha'],
+                required: ['email', 'senha'],
                 properties: {
-                  login: { type: 'string', example: 'benedito' },
+                  email: { type: 'string', format: 'email', example: 'benedito@prumo.com' },
                   senha: { type: 'string', format: 'password', example: '123456' },
                 },
               },
@@ -491,7 +491,7 @@ export const openapiSpec = {
         responses: {
           201: ok(ref('Usuario'), 'Criado'),
           400: erro('Dados inválidos'),
-          409: erro('Login já existe'),
+          409: erro('E-mail já existe'),
         },
       },
     },

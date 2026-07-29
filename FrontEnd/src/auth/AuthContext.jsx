@@ -51,8 +51,8 @@ export function AuthProvider({ children }) {
   }, []);
 
   // login: recebe credenciais, guarda o access em memória e o usuário
-  const entrar = useCallback(async (login, senha) => {
-    const dados = await api.post('/auth/login', { login, senha });
+  const entrar = useCallback(async (email, senha) => {
+    const dados = await api.post('/auth/login', { email, senha });
     definirAccessToken(dados.accessToken);
     setUsuario(dados.usuario);
     return dados.usuario;

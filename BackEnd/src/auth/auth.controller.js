@@ -38,18 +38,20 @@ async function emitirSessao(res, usuario) {
 
 // Dados públicos do usuário (nunca a senha).
 function usuarioPublico(u) {
-  return { id: u.id, nome: u.nome, login: u.login, papel: u.papel, ativo: u.ativo };
+  return { id: u.id, nome: u.nome, email: u.email, papel: u.papel, ativo: u.ativo };
 }
 
-// POST /api/auth/login  { login, senha }
+// POST /api/auth/login  { email, senha }
 export async function login(req, res) {
   try {
-    const { login, senha } = req.body;
-    if (!login || !senha) {
-      return res.status(400).json({ erro: 'Login e senha são obrigatórios' });
+    const { email, senha } = req.body;
+    if (!email || !senha) {
+      return res.status(400).json({ erro: 'E-mail e senha são obrigatórios' });
     }
 
-    const r = await query('SELECT * FROM usuario WHERE login = $1', [login.trim()]);
+    const r = await query('SELECT * FROM usuario WHERE email = $1', [
+      email.trim().toLowerCase(),
+    ]);
     const usuario = r.rows[0];
 
     // Mesma resposta para usuário inexistente ou senha errada (não vaza qual falhou)

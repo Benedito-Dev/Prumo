@@ -19,7 +19,7 @@ try {
 // Tela de login (versão visual/protótipo) — split-screen com vitrine
 // em foto de obra (P&B + overlay grafite).
 export default function Login() {
-  const [login, setLogin] = useState('');
+  const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [erro, setErro] = useState('');
   const [carregando, setCarregando] = useState(false);
@@ -30,14 +30,14 @@ export default function Login() {
     e.preventDefault();
     setErro('');
 
-    if (!login || !senha) {
-      setErro('Preencha login e senha.');
+    if (!email || !senha) {
+      setErro('Preencha e-mail e senha.');
       return;
     }
 
     setCarregando(true);
     try {
-      await entrar(login.trim(), senha);
+      await entrar(email.trim(), senha);
       navigate('/', { replace: true });
     } catch (e) {
       // mensagem vinda da API (401/403) ou fallback de conexão
@@ -118,12 +118,13 @@ export default function Login() {
           </h2>
 
           <Campo
-            rotulo="Login"
-            value={login}
-            onChange={(e) => setLogin(e.target.value)}
+            rotulo="E-mail"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
             autoFocus
             autoCapitalize="none"
-            placeholder="seu usuário"
+            placeholder="voce@email.com"
           />
           <Campo
             rotulo="Senha"

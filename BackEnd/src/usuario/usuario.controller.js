@@ -7,7 +7,10 @@ import { query } from '../config/db.js';
 const PAPEIS_VALIDOS = ['dono', 'vendedor', 'caixa', 'estoque'];
 
 // Colunas seguras para retornar — NUNCA inclui senha_hash.
-const COLUNAS_PUBLICAS = 'id, nome, login, papel, ativo, criado_em';
+const COLUNAS_PUBLICAS = 'id, nome, email, papel, ativo, criado_em';
+
+// Validação simples de formato de e-mail.
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // GET /api/usuarios
 export async function listarUsuarios(req, res) {
@@ -42,10 +45,13 @@ export async function buscarUsuario(req, res) {
 // POST /api/usuarios
 export async function criarUsuario(req, res) {
   try {
-    const { nome, login, senha, papel } = req.body;
+    const { nome, email, senha, papel } = req.body;
 
-    if (!nome || !login || !senha) {
-      return res.status(400).json({ erro: 'Nome, login e senha são obrigatórios' });
+    if (!nome || !email || !senha) {
+      return res.status(400).json({ erro: 'Nome, e-mail e senha são obrigatórios' });
+    }
+    if (!EMAIL_REGEX.test(email)) {
+      return res.status(400).json({ erro: 'E-mail inválido' });
     }
     if (papel && !PAPEIS_VALIDOS.includes(papel)) {
       return res.status(400).json({ erro: `Papel inválido. Use: ${PAPEIS_VALIDOS.join(', ')}` });
@@ -55,16 +61,16 @@ export async function criarUsuario(req, res) {
     const senha_hash = await bcrypt.hash(senha, 10);
 
     const resultado = await query(
-      `INSERT INTO usuario (nome, login, senha_hash, papel)
+      `INSERT INTO usuario (nome, email, senha_hash, papel)
        VALUES ($1, $2, $3, $4)
        RETURNING ${COLUNAS_PUBLICAS}`,
-      [nome, login, senha_hash, papel ?? 'dono']
+      [nome, email.trim().toLowerCase(), senha_hash, papel ?? 'dono']
     );
     res.status(201).json(resultado.rows[0]);
   } catch (erro) {
-    // login é UNIQUE no schema
+    // email é UNIQUE no schema
     if (erro.code === '23505') {
-      return res.status(409).json({ erro: 'Já existe um usuário com esse login' });
+      return res.status(409).json({ erro: 'Já existe um usuário com esse e-mail' });
     }
     res.status(500).json({ erro: 'Falha ao criar usuário', detalhe: erro.message });
   }

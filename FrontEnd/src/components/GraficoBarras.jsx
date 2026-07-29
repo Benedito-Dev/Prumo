@@ -15,7 +15,7 @@ export default function GraficoBarras({ dados = [], preencher = false }) {
 
   return (
     <div className={preencher ? 'h-full flex flex-col' : ''}>
-      <div className={`flex items-end gap-2 pt-2 ${preencher ? 'flex-1 min-h-0' : 'h-[150px]'}`}>
+      <div className={`flex items-end gap-2 pt-2 ${preencher ? 'flex-1 min-h-0' : 'h-[130px]'}`}>
         {dados.map((d, i) => {
           const altura = Math.max((d.valor / max) * 100, 2);
           const ultima = i === dados.length - 1;

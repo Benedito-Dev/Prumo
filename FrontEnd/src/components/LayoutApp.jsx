@@ -79,7 +79,7 @@ export default function LayoutApp({ titulo, periodo, acao, children }) {
       {/* ---------- ÁREA DE CONTEÚDO ---------- */}
       <div className="flex-1 ml-[210px] flex flex-col min-h-screen">
         {/* topbar leve */}
-        <header className="h-12 bg-superficie border-b border-linha flex items-center justify-between px-5 sticky top-0 z-10">
+        <header className="h-14 bg-superficie border-b border-linha flex items-center justify-between px-5 sticky top-0 z-10">
           <div className="flex items-center gap-3">
             <h2 className="font-display text-[15px] text-grafite">{titulo || 'Painel'}</h2>
             {periodo && (

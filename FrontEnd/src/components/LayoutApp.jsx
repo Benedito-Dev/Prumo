@@ -1,13 +1,14 @@
 import { NavLink, useNavigate } from 'react-router-dom';
+import { LayoutDashboard, Receipt, Users, Package, LogOut } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 
 // Layout das telas internas (web/desktop): sidebar fixa à esquerda +
 // área de conteúdo à direita. Cada item de navegação tem ícone e rótulo.
 const NAV = [
-  { para: '/', rotulo: 'Painel', icone: '📊', fim: true },
-  { para: '/vendas', rotulo: 'Vendas', icone: '🧾' },
-  { para: '/clientes', rotulo: 'Clientes', icone: '👥' },
-  { para: '/produtos', rotulo: 'Produtos', icone: '📦' },
+  { para: '/', rotulo: 'Painel', Icone: LayoutDashboard, fim: true },
+  { para: '/vendas', rotulo: 'Vendas', Icone: Receipt },
+  { para: '/clientes', rotulo: 'Clientes', Icone: Users },
+  { para: '/produtos', rotulo: 'Produtos', Icone: Package },
 ];
 
 export default function LayoutApp({ titulo, periodo, acao, children }) {
@@ -45,7 +46,7 @@ export default function LayoutApp({ titulo, periodo, acao, children }) {
                    : 'text-[#A8B0B8] hover:bg-white/5 hover:text-superficie'}`
               }
             >
-              <span className="text-[15px] w-5 text-center">{item.icone}</span>
+              <item.Icone size={17} strokeWidth={2} className="shrink-0" />
               {item.rotulo}
             </NavLink>
           ))}
@@ -70,7 +71,7 @@ export default function LayoutApp({ titulo, periodo, acao, children }) {
             onClick={aoSair}
             className="w-full flex items-center gap-2.5 px-3 py-2 rounded-p text-[13px] font-semibold text-[#A8B0B8] hover:bg-white/5 hover:text-superficie transition-colors"
           >
-            <span className="text-[14px] w-5 text-center">↩</span>
+            <LogOut size={16} strokeWidth={2} className="shrink-0" />
             Sair
           </button>
         </div>

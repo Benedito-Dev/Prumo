@@ -1,16 +1,27 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import LayoutApp from '../components/LayoutApp';
-import { Botao, EstadoVazio, GraficoBarras } from '../components';
+import { Botao, EstadoVazio } from '../components';
+import GraficoArea from '../components/GraficoArea';
 import { painelService } from '../services/painel';
 import { api } from '../services/api';
-import { moedaCurta, moeda, numero } from '../utils/formato';
+import { moeda, numero } from '../utils/formato';
+import {
+  Banknote,
+  Landmark,
+  CreditCard,
+  NotebookPen,
+  Wallet,
+  Receipt,
+  ShoppingCart,
+  Users,
+} from 'lucide-react';
 
 const FORMAS = {
-  dinheiro: { rotulo: 'Dinheiro', cor: '#1B7A46' },
-  pix: { rotulo: 'Pix', cor: '#16191D' },
-  cartao: { rotulo: 'Cartão', cor: '#565D66' },
-  fiado: { rotulo: 'Fiado', cor: '#FFC400' },
+  dinheiro: { rotulo: 'Dinheiro', Icone: Banknote, cor: '#1B7A46' },
+  pix: { rotulo: 'Pix', Icone: Landmark, cor: '#16191D' },
+  cartao: { rotulo: 'Cartão', Icone: CreditCard, cor: '#565D66' },
+  fiado: { rotulo: 'Fiado', Icone: NotebookPen, cor: '#D9A500' },
 };
 
 const PERIODOS = [
@@ -20,7 +31,6 @@ const PERIODOS = [
   { id: 'ano', rotulo: 'Ano' },
 ];
 
-// Painel de indicadores (RF16–RF22). Grade modular com filtro de período.
 export default function Painel() {
   const navigate = useNavigate();
   const [periodo, setPeriodo] = useState('mes');
@@ -34,9 +44,9 @@ export default function Painel() {
       const [faturamento, resumo, ranking, evolucao, produtos, vendas] = await Promise.all([
         painelService.faturamento(),
         painelService.resumo(per),
-        painelService.rankingClientes(per, 5),
+        painelService.rankingClientes(per, 6),
         painelService.evolucaoFaturamento(per),
-        painelService.produtosMaisVendidos(per, 5),
+        painelService.produtosMaisVendidos(per, 6),
         api.get('/vendas?status=concluida'),
       ]);
       setDados({ faturamento, resumo, ranking, evolucao, produtos, vendas });
@@ -56,28 +66,23 @@ export default function Painel() {
     .toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
     .toUpperCase();
 
-  // Barra de filtros + ação — sempre visível
-  const filtros = (
-    <div className="flex items-center gap-1 bg-concreto rounded-p p-0.5">
-      {PERIODOS.map((p) => (
-        <button
-          key={p.id}
-          onClick={() => setPeriodo(p.id)}
-          className={`px-3 py-1 rounded-[4px] text-[12px] font-bold transition-colors ${
-            periodo === p.id
-              ? 'bg-superficie text-grafite shadow-sm'
-              : 'text-grafite-medio hover:text-grafite'
-          }`}
-        >
-          {p.rotulo}
-        </button>
-      ))}
-    </div>
-  );
-
   const acaoTopbar = (
-    <div className="flex items-center gap-3">
-      {filtros}
+    <div className="flex items-center gap-2">
+      <div className="flex items-center gap-0.5 bg-concreto rounded-p p-0.5">
+        {PERIODOS.map((p) => (
+          <button
+            key={p.id}
+            onClick={() => setPeriodo(p.id)}
+            className={`px-3 py-1 rounded-[4px] text-[12px] font-bold transition-colors ${
+              periodo === p.id
+                ? 'bg-superficie text-grafite shadow-sm'
+                : 'text-grafite-medio hover:text-grafite'
+            }`}
+          >
+            {p.rotulo}
+          </button>
+        ))}
+      </div>
       <button
         onClick={() => navigate('/vendas/nova')}
         className="h-8 px-4 rounded-p bg-trena hover:bg-trena-escuro text-grafite font-bold text-[13px] transition-colors"
@@ -102,19 +107,12 @@ export default function Painel() {
   const { faturamento, resumo, ranking, evolucao, produtos, vendas } = dados;
   const semVendas = resumo.qtd_vendas === 0;
 
-  // Breakdown por forma de pagamento
-  const porForma = Object.keys(FORMAS)
-    .map((f) => {
-      const doTipo = vendas.filter((v) => v.forma_pagamento === f);
-      return {
-        forma: f,
-        total: doTipo.reduce((s, v) => s + Number(v.valor_total), 0),
-        qtd: doTipo.length,
-      };
-    })
-    .filter((x) => x.qtd > 0)
-    .sort((a, b) => b.total - a.total);
-  const totalPago = porForma.reduce((s, x) => s + x.total, 0) || 1;
+  // recebimento por forma
+  const porForma = Object.keys(FORMAS).map((f) => {
+    const doTipo = vendas.filter((v) => v.forma_pagamento === f);
+    return { forma: f, total: doTipo.reduce((s, v) => s + Number(v.valor_total), 0) };
+  });
+  const totalRecebido = porForma.reduce((s, x) => s + x.total, 0) || 1;
 
   const recentes = [...vendas]
     .sort((a, b) => new Date(b.vendida_em) - new Date(a.vendida_em))
@@ -122,19 +120,22 @@ export default function Painel() {
 
   const serie = evolucao.map((e) => {
     const d = new Date(e.dia);
-    return { rotulo: String(d.getUTCDate()), valor: e.total };
+    return { rotulo: d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }), valor: e.total };
   });
 
   const variacao =
-    faturamento.variacao_pct == null
-      ? null
-      : `${Math.abs(faturamento.variacao_pct)}% vs. mês anterior`;
+    faturamento.variacao_pct == null ? null : `${Math.abs(faturamento.variacao_pct)}% vs mês anterior`;
   const sentido =
-    faturamento.variacao_pct == null
-      ? undefined
-      : faturamento.variacao_pct >= 0
-        ? 'sobe'
-        : 'desce';
+    faturamento.variacao_pct == null ? null : faturamento.variacao_pct >= 0 ? 'sobe' : 'desce';
+
+  // sub-informações dos KPIs
+  const diasNoPeriodo = Math.max(serie.length, 1);
+  const porDia = resumo.total / diasNoPeriodo;
+  const clientesDistintos = new Set(vendas.filter((v) => v.cliente_id).map((v) => v.cliente_id)).size;
+  const comprasPorCliente = clientesDistintos ? resumo.qtd_vendas / clientesDistintos : 0;
+
+  const maxCliente = Math.max(...ranking.map((c) => Number(c.total_gasto)), 1);
+  const maxProduto = Math.max(...produtos.map((p) => Number(p.valor_total)), 1);
 
   return (
     <LayoutApp titulo="Painel" periodo={periodoLabel} acao={acaoTopbar}>
@@ -152,207 +153,223 @@ export default function Painel() {
           Lance a primeira venda e os números do painel começam a aparecer.
         </EstadoVazio>
       ) : (
-        // GRADE MODULAR: 12 colunas, linhas de altura fixa que preenchem a tela
-        <div className="grid grid-cols-12 auto-rows-[minmax(0,1fr)] gap-3 h-[calc(100vh-56px-32px)] min-h-[600px]">
-          {/* ---- LINHA 1: KPIs (4 módulos) ---- */}
-          <KpiModulo
-            className="col-span-3"
-            rotulo="Faturamento"
-            valor={moedaCurta(faturamento.mes_atual)}
-            variacao={variacao}
-            sentido={sentido}
-            destaque
-          />
-          <KpiModulo
-            className="col-span-3"
-            rotulo="Ticket médio"
-            valor={moedaCurta(resumo.ticket_medio)}
-          />
-          <KpiModulo
-            className="col-span-3"
-            rotulo="Vendas"
-            valor={numero(resumo.qtd_vendas)}
-          />
-          <KpiModulo
-            className="col-span-3"
-            rotulo="Nº de clientes"
-            valor={numero(ranking.filter((r) => r.cliente_id).length)}
-          />
+        <div className="flex flex-col gap-4">
+          {/* ---- KPIs ---- */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Kpi
+              Icone={Wallet}
+              rotulo="Faturamento do período"
+              valor={moeda(resumo.total)}
+              destaque
+              chip={variacao}
+              sentido={sentido}
+            />
+            <Kpi Icone={Receipt} rotulo="Ticket médio" valor={moeda(resumo.ticket_medio)} sub="valor médio por venda" />
+            <Kpi
+              Icone={ShoppingCart}
+              rotulo="Vendas realizadas"
+              valor={numero(resumo.qtd_vendas)}
+              sub={`${moeda(porDia)} por dia em média`}
+            />
+            <Kpi
+              Icone={Users}
+              rotulo="Clientes distintos"
+              valor={numero(clientesDistintos)}
+              sub={`${comprasPorCliente.toFixed(1)} compras por cliente`}
+            />
+          </div>
 
-          {/* ---- LINHA 2-3: gráfico grande (esq) + clientes (dir) ---- */}
-          <Modulo className="col-span-8 row-span-2" titulo="Faturamento por dia" extra={periodoLabel}>
-            <div className="flex-1 min-h-0">
-              <GraficoBarras dados={serie} preencher />
-            </div>
-          </Modulo>
+          {/* ---- Gráfico + Recebimento ---- */}
+          <div className="grid grid-cols-1 lg:grid-cols-[1.7fr_1fr] gap-4">
+            <Cartao titulo="Faturamento por dia">
+              <div className="h-[280px]">
+                <GraficoArea dados={serie} />
+              </div>
+            </Cartao>
 
-          <Modulo className="col-span-4 row-span-2" titulo="Quem mais comprou" extra={`Top ${ranking.length}`}>
-            <ListaCartao vazio={ranking.length === 0} textoVazio="Sem clientes.">
-              {ranking.slice(0, 5).map((c, i) => (
-                <LinhaRank
+            <Cartao titulo="Recebimento por forma de pagamento">
+              <div className="flex flex-col gap-3 pt-1">
+                {porForma.map((x) => {
+                  const pct = (x.total / totalRecebido) * 100;
+                  return (
+                    <div key={x.forma}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[13px] font-semibold flex items-center gap-2">
+                          {(() => {
+                            const I = FORMAS[x.forma].Icone;
+                            return <I size={15} strokeWidth={1.75} className="text-grafite-medio" />;
+                          })()}
+                          {FORMAS[x.forma].rotulo}
+                        </span>
+                        <span className="text-[13px] font-bold tabular-nums">{moeda(x.total)}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 h-1.5 bg-concreto rounded-full overflow-hidden">
+                          <div
+                            className="h-full rounded-full"
+                            style={{ width: `${pct}%`, background: FORMAS[x.forma].cor }}
+                          />
+                        </div>
+                        <span className="text-[11px] text-grafite-medio tabular-nums w-8 text-right">
+                          {Math.round(pct)}%
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+                <div className="flex items-center justify-between pt-2 mt-1 border-t border-linha">
+                  <span className="text-[12px] text-grafite-medio font-semibold">Total recebido</span>
+                  <span className="text-[14px] font-bold tabular-nums">{moeda(totalRecebido)}</span>
+                </div>
+              </div>
+            </Cartao>
+          </div>
+
+          {/* ---- Rankings com barra de proporção ---- */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <Cartao titulo="Clientes que mais compraram" acao="Ver todos" onAcao={() => navigate('/clientes')}>
+              {ranking.map((c, i) => (
+                <LinhaBarra
                   key={c.cliente_id ?? `c-${i}`}
                   pos={i + 1}
                   nome={c.cliente_nome}
-                  meta={`${c.qtd_compras} ${c.qtd_compras === 1 ? 'compra' : 'compras'}`}
+                  meta={`${c.qtd_compras} compras`}
                   valor={moeda(c.total_gasto)}
+                  proporcao={Number(c.total_gasto) / maxCliente}
+                  cor="#1B7A46"
                 />
               ))}
-            </ListaCartao>
-          </Modulo>
+            </Cartao>
 
-          {/* ---- LINHA 4-5: 3 módulos embaixo ---- */}
-          <Modulo className="col-span-4 row-span-2" titulo="Produtos mais vendidos" extra={`Top ${produtos.length}`}>
-            <ListaCartao vazio={produtos.length === 0} textoVazio="Sem produtos.">
-              {produtos.slice(0, 5).map((p, i) => (
-                <LinhaRank
+            <Cartao titulo="Produtos mais vendidos" acao="Ver todos" onAcao={() => navigate('/produtos')}>
+              {produtos.map((p, i) => (
+                <LinhaBarra
                   key={p.produto_id ?? `p-${i}`}
                   pos={i + 1}
                   nome={p.produto_nome}
                   meta={`${numero(p.quantidade_total)} un.`}
                   valor={moeda(p.valor_total)}
+                  proporcao={Number(p.valor_total) / maxProduto}
+                  cor="#D9A500"
                 />
               ))}
-            </ListaCartao>
-          </Modulo>
+            </Cartao>
+          </div>
 
-          <Modulo className="col-span-4 row-span-2" titulo="Recebimento por forma" extra="Composição">
-            <div className="flex-1 flex flex-col justify-center gap-2.5">
-              <div className="flex h-2.5 rounded-full overflow-hidden">
-                {porForma.map((x) => (
-                  <div
-                    key={x.forma}
-                    style={{ width: `${(x.total / totalPago) * 100}%`, background: FORMAS[x.forma].cor }}
-                    title={`${FORMAS[x.forma].rotulo}: ${moeda(x.total)}`}
-                  />
+          {/* ---- Vendas recentes (tabela) ---- */}
+          <Cartao titulo="Vendas recentes" acao="Ver todas as vendas" onAcao={() => navigate('/vendas')}>
+            <table className="w-full">
+              <thead>
+                <tr className="text-[10.5px] font-bold tracking-[0.08em] uppercase text-grafite-medio">
+                  <th className="text-left py-2 font-bold">Cliente</th>
+                  <th className="text-left py-2 font-bold">Pagamento</th>
+                  <th className="text-left py-2 font-bold">Data</th>
+                  <th className="text-right py-2 font-bold">Valor</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentes.map((v) => (
+                  <tr key={v.id} className="border-t border-linha text-[13px]">
+                    <td className="py-2.5 font-semibold">{v.cliente_nome || 'Consumidor'}</td>
+                    <td className="py-2.5">
+                      <span className="inline-flex items-center gap-1.5 text-grafite-medio">
+                        <span className="w-2 h-2 rounded-full" style={{ background: FORMAS[v.forma_pagamento]?.cor }} />
+                        {FORMAS[v.forma_pagamento]?.rotulo || v.forma_pagamento}
+                      </span>
+                    </td>
+                    <td className="py-2.5 text-grafite-medio tabular-nums">
+                      {new Date(v.vendida_em).toLocaleDateString('pt-BR')}
+                    </td>
+                    <td className="py-2.5 text-right font-bold tabular-nums">{moeda(v.valor_total)}</td>
+                  </tr>
                 ))}
-              </div>
-              {porForma.map((x) => (
-                <div key={x.forma} className="flex items-center gap-2 py-1 border-b border-linha last:border-b-0">
-                  <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: FORMAS[x.forma].cor }} />
-                  <span className="text-[12.5px] font-semibold flex-1">{FORMAS[x.forma].rotulo}</span>
-                  <span className="text-[11px] text-grafite-medio w-9 text-right">
-                    {Math.round((x.total / totalPago) * 100)}%
-                  </span>
-                  <span className="text-[12.5px] font-bold tabular-nums w-20 text-right">
-                    {moeda(x.total)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </Modulo>
-
-          <Modulo className="col-span-4 row-span-2" titulo="Vendas recentes" extra={`${vendas.length}`}>
-            <ListaCartao vazio={recentes.length === 0} textoVazio="Nenhuma venda.">
-              {recentes.slice(0, 5).map((v) => (
-                <div key={v.id} className="flex items-center gap-2.5 py-1 border-b border-linha last:border-b-0">
-                  <span
-                    className="w-2 h-2 rounded-full shrink-0"
-                    style={{ background: FORMAS[v.forma_pagamento]?.cor || '#565D66' }}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[12.5px] font-semibold truncate leading-tight">
-                      {v.cliente_nome || 'Consumidor'}
-                    </p>
-                    <p className="text-[10.5px] text-grafite-medio leading-tight">
-                      {FORMAS[v.forma_pagamento]?.rotulo || v.forma_pagamento} ·{' '}
-                      {new Date(v.vendida_em).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
-                    </p>
-                  </div>
-                  <span className="font-bold text-[12.5px] tabular-nums whitespace-nowrap">
-                    {moeda(v.valor_total)}
-                  </span>
-                </div>
-              ))}
-            </ListaCartao>
-          </Modulo>
+              </tbody>
+            </table>
+          </Cartao>
         </div>
       )}
     </LayoutApp>
   );
 }
 
-// ---------- Módulos da grade ----------
+// ---------- Componentes ----------
 
-// Módulo genérico: cartão que preenche sua célula da grade.
-function Modulo({ className = '', titulo, extra, children }) {
+function Cartao({ titulo, acao, onAcao, children }) {
   return (
-    <div className={`bg-superficie border border-linha rounded-md px-4 py-3 flex flex-col min-h-0 ${className}`}>
-      <div className="flex items-center justify-between mb-2 shrink-0">
-        <p className="text-[10.5px] font-bold tracking-[0.1em] uppercase text-grafite-medio">{titulo}</p>
-        {extra && <span className="text-[10.5px] text-grafite-medio">{extra}</span>}
-      </div>
+    <div className="bg-superficie border border-linha rounded-md px-5 py-4">
+      {titulo && (
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-[14px] font-bold text-grafite">{titulo}</p>
+          {acao && (
+            <button onClick={onAcao} className="text-[12px] font-semibold text-grafite-medio hover:text-grafite">
+              {acao}
+            </button>
+          )}
+        </div>
+      )}
       {children}
     </div>
   );
 }
 
-// KPI como módulo da grade (preenche a célula).
-function KpiModulo({ className = '', rotulo, valor, variacao, sentido, destaque = false }) {
-  const seta = sentido === 'sobe' ? '↑' : sentido === 'desce' ? '↓' : '';
-  const base = destaque ? 'bg-grafite text-superficie' : 'bg-superficie border border-linha';
-  const corRotulo = destaque ? 'text-[#A8B0B8]' : 'text-grafite-medio';
-  const corVar =
-    sentido === 'sobe'
-      ? destaque ? 'text-[#5fcf94]' : 'text-nivel'
-      : sentido === 'desce'
-        ? destaque ? 'text-[#ff8a7a]' : 'text-prumo'
-        : 'text-grafite-medio';
-
+function Kpi({ Icone, rotulo, valor, sub, chip, sentido, destaque = false }) {
+  const corChip = sentido === 'sobe' ? 'bg-nivel/10 text-nivel' : 'bg-prumo/10 text-prumo';
+  const seta = sentido === 'sobe' ? '↗' : '↘';
   return (
-    <div className={`relative overflow-hidden rounded-md px-4 flex flex-col justify-center ${base} ${className}`}>
+    <div className="relative overflow-hidden bg-superficie border border-linha rounded-md px-5 py-4">
       {destaque && <div className="absolute left-0 top-0 bottom-0 w-1 bg-trena" />}
-      <p className={`text-[10.5px] font-bold tracking-[0.09em] uppercase ${corRotulo}`}>{rotulo}</p>
-      <p className="font-display text-[24px] leading-none mt-1 tabular-nums tracking-[-0.02em]">{valor}</p>
-      {variacao && <p className={`text-[11px] font-bold mt-1 tabular-nums ${corVar}`}>{seta} {variacao}</p>}
+      <div className="flex items-start justify-between">
+        <p className="text-[10.5px] font-bold tracking-[0.08em] uppercase text-grafite-medio">{rotulo}</p>
+        {Icone && <Icone size={17} strokeWidth={1.75} className="text-grafite-medio/50 shrink-0" />}
+      </div>
+      <p className="font-display text-[28px] leading-none mt-2 tabular-nums tracking-[-0.02em]">{valor}</p>
+      {chip && (
+        <span className={`inline-block mt-2 px-2 py-0.5 rounded text-[11px] font-bold tabular-nums ${corChip}`}>
+          {seta} {chip}
+        </span>
+      )}
+      {sub && <p className="text-[11.5px] text-grafite-medio mt-2">{sub}</p>}
     </div>
   );
 }
 
-// Lista que estica e distribui as linhas dentro do módulo.
-function ListaCartao({ vazio, textoVazio, children }) {
-  if (vazio) {
-    return (
-      <div className="flex-1 flex items-center">
-        <p className="text-[12px] text-grafite-medio">{textoVazio}</p>
-      </div>
-    );
-  }
-  return <div className="flex-1 flex flex-col justify-around min-h-0">{children}</div>;
-}
-
-// Linha de ranking compacta.
-function LinhaRank({ pos, nome, meta, valor }) {
+// Linha de ranking com barra de proporção sob o nome.
+function LinhaBarra({ pos, nome, meta, valor, proporcao, cor }) {
   return (
-    <div className="flex items-center gap-2.5 py-1 border-b border-linha last:border-b-0">
-      <span
-        className={`w-5 h-5 rounded-full flex items-center justify-center font-display text-[11px] shrink-0 ${
-          pos === 1 ? 'bg-trena text-grafite' : 'bg-concreto text-grafite-medio'
-        }`}
-      >
+    <div className="flex items-center gap-3 py-2.5 border-b border-linha last:border-b-0">
+      <span className="w-4 font-display text-[12px] text-grafite-medio tabular-nums text-center shrink-0">
         {pos}
       </span>
       <div className="flex-1 min-w-0">
-        <p className="text-[12.5px] font-semibold truncate leading-tight">{nome}</p>
-        <p className="text-[10.5px] text-grafite-medio leading-tight">{meta}</p>
+        <p className="text-[13px] font-semibold truncate mb-1">{nome}</p>
+        <div className="h-1 bg-concreto rounded-full overflow-hidden">
+          <div className="h-full rounded-full" style={{ width: `${Math.max(proporcao * 100, 3)}%`, background: cor }} />
+        </div>
       </div>
-      <span className="font-bold text-[12.5px] tabular-nums whitespace-nowrap">{valor}</span>
+      <span className="text-[11.5px] text-grafite-medio tabular-nums whitespace-nowrap w-20 text-right">
+        {meta}
+      </span>
+      <span className="text-[13px] font-bold tabular-nums whitespace-nowrap w-24 text-right">{valor}</span>
     </div>
   );
 }
 
-// Esqueleto de carregamento — silhueta da grade.
 function PainelEsqueleto() {
   return (
-    <div className="grid grid-cols-12 auto-rows-[minmax(0,1fr)] gap-3 h-[calc(100vh-56px-32px)] min-h-[600px] animate-pulse">
-      <div className="col-span-3 bg-grafite/80 rounded-md" />
-      <div className="col-span-3 bg-superficie border border-linha rounded-md" />
-      <div className="col-span-3 bg-superficie border border-linha rounded-md" />
-      <div className="col-span-3 bg-superficie border border-linha rounded-md" />
-      <div className="col-span-8 row-span-2 bg-superficie border border-linha rounded-md" />
-      <div className="col-span-4 row-span-2 bg-superficie border border-linha rounded-md" />
-      <div className="col-span-4 row-span-2 bg-superficie border border-linha rounded-md" />
-      <div className="col-span-4 row-span-2 bg-superficie border border-linha rounded-md" />
-      <div className="col-span-4 row-span-2 bg-superficie border border-linha rounded-md" />
+    <div className="flex flex-col gap-4 animate-pulse">
+      <div className="grid grid-cols-4 gap-4">
+        {[0, 1, 2, 3].map((i) => (
+          <div key={i} className="h-24 bg-superficie border border-linha rounded-md" />
+        ))}
+      </div>
+      <div className="grid grid-cols-[1.7fr_1fr] gap-4">
+        <div className="h-80 bg-superficie border border-linha rounded-md" />
+        <div className="h-80 bg-superficie border border-linha rounded-md" />
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="h-56 bg-superficie border border-linha rounded-md" />
+        <div className="h-56 bg-superficie border border-linha rounded-md" />
+      </div>
     </div>
   );
 }

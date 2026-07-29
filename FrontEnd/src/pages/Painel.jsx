@@ -299,7 +299,7 @@ function Cartao({ titulo, acao, onAcao, children }) {
     <div className="bg-superficie border border-linha rounded-md px-5 py-4">
       {titulo && (
         <div className="flex items-center justify-between mb-3">
-          <p className="text-[14px] font-bold text-grafite">{titulo}</p>
+          <p className="text-[13.5px] font-semibold text-grafite">{titulo}</p>
           {acao && (
             <button onClick={onAcao} className="text-[12px] font-semibold text-grafite-medio hover:text-grafite">
               {acao}
@@ -322,7 +322,17 @@ function Kpi({ Icone, rotulo, valor, sub, chip, sentido, destaque = false }) {
         <p className="text-[10.5px] font-bold tracking-[0.08em] uppercase text-grafite-medio">{rotulo}</p>
         {Icone && <Icone size={17} strokeWidth={1.75} className="text-grafite-medio/50 shrink-0" />}
       </div>
-      <p className="font-display text-[28px] leading-none mt-2 tabular-nums tracking-[-0.02em]">{valor}</p>
+      {/* Só o KPI em destaque usa a fonte pesada (Archivo Black). Os demais
+          usam Archivo semibold — hierarquia: um único ponto focal. */}
+      <p
+        className={`leading-none mt-2 tabular-nums tracking-[-0.02em] ${
+          destaque
+            ? 'font-display text-[30px]'
+            : 'font-ui font-semibold text-[26px] text-grafite'
+        }`}
+      >
+        {valor}
+      </p>
       {chip && (
         <span className={`inline-block mt-2 px-2 py-0.5 rounded text-[11px] font-bold tabular-nums ${corChip}`}>
           {seta} {chip}
@@ -337,7 +347,7 @@ function Kpi({ Icone, rotulo, valor, sub, chip, sentido, destaque = false }) {
 function LinhaBarra({ pos, nome, meta, valor, proporcao, cor }) {
   return (
     <div className="flex items-center gap-3 py-2.5 border-b border-linha last:border-b-0">
-      <span className="w-4 font-display text-[12px] text-grafite-medio tabular-nums text-center shrink-0">
+      <span className="w-4 font-ui font-semibold text-[12px] text-grafite-medio tabular-nums text-center shrink-0">
         {pos}
       </span>
       <div className="flex-1 min-w-0">

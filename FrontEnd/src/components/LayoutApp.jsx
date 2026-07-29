@@ -82,7 +82,7 @@ export default function LayoutApp({ titulo, periodo, acao, children }) {
         {/* topbar leve */}
         <header className="h-14 bg-superficie border-b border-linha flex items-center justify-between px-5 sticky top-0 z-10">
           <div className="flex items-center gap-3">
-            <h2 className="font-display text-[15px] text-grafite">{titulo || 'Painel'}</h2>
+            <h2 className="font-ui font-bold text-[15px] text-grafite tracking-tight">{titulo || 'Painel'}</h2>
             {periodo && (
               <span className="text-[11px] text-grafite-medio font-semibold uppercase tracking-wide">
                 · {periodo}

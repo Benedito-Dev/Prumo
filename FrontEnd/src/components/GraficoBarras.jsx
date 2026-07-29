@@ -1,7 +1,8 @@
 // Gráfico de barras simples do design system (seção 06 / RF22).
 // Barras cinza, última em destaque amarelo (trena). Legível de relance,
 // sem eixo Y — "um número por vez". Recebe dados [{ rotulo, valor }].
-export default function GraficoBarras({ dados = [] }) {
+// preencher=true: ocupa toda a altura do contêiner (para cards altos).
+export default function GraficoBarras({ dados = [], preencher = false }) {
   const max = Math.max(...dados.map((d) => d.valor), 1);
 
   if (dados.length === 0) {
@@ -13,8 +14,8 @@ export default function GraficoBarras({ dados = [] }) {
   }
 
   return (
-    <div>
-      <div className="flex items-end gap-1.5 h-24 pt-2">
+    <div className={preencher ? 'h-full flex flex-col' : ''}>
+      <div className={`flex items-end gap-2 pt-2 ${preencher ? 'flex-1 min-h-0' : 'h-[150px]'}`}>
         {dados.map((d, i) => {
           const altura = Math.max((d.valor / max) * 100, 2);
           const ultima = i === dados.length - 1;
@@ -22,15 +23,15 @@ export default function GraficoBarras({ dados = [] }) {
             <div
               key={i}
               title={`${d.rotulo}: ${d.valor}`}
-              className={`flex-1 rounded-t-sm transition-[height] ${
-                ultima ? 'bg-trena' : 'bg-linha'
+              className={`group relative flex-1 rounded-t-[3px] transition-[height,background] hover:opacity-90 ${
+                ultima ? 'bg-trena' : 'bg-linha hover:bg-grafite-medio'
               }`}
               style={{ height: `${altura}%` }}
             />
           );
         })}
       </div>
-      <div className="flex gap-1.5 mt-1.5">
+      <div className="flex gap-1.5 mt-1.5 shrink-0">
         {dados.map((d, i) => (
           <span
             key={i}

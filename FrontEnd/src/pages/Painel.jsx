@@ -17,11 +17,13 @@ import {
   Users,
 } from 'lucide-react';
 
+// Cores das formas de pagamento — escolhidas para ter contraste nos
+// dois temas (evita grafite escuro que some no tema escuro).
 const FORMAS = {
-  dinheiro: { rotulo: 'Dinheiro', Icone: Banknote, cor: '#1B7A46' },
-  pix: { rotulo: 'Pix', Icone: Landmark, cor: '#16191D' },
-  cartao: { rotulo: 'Cartão', Icone: CreditCard, cor: '#565D66' },
-  fiado: { rotulo: 'Fiado', Icone: NotebookPen, cor: '#D9A500' },
+  dinheiro: { rotulo: 'Dinheiro', Icone: Banknote, cor: '#1B7A46' }, // verde
+  pix: { rotulo: 'Pix', Icone: Landmark, cor: '#2AA9B8' },           // ciano (cor do Pix)
+  cartao: { rotulo: 'Cartão', Icone: CreditCard, cor: '#7C6FE8' },   // roxo
+  fiado: { rotulo: 'Fiado', Icone: NotebookPen, cor: '#D9A500' },    // trena
 };
 
 const PERIODOS = [
@@ -163,6 +165,7 @@ export default function Painel() {
               destaque
               chip={variacao}
               sentido={sentido}
+              sub={variacao ? undefined : `${moeda(porDia)} por dia em média`}
             />
             <Kpi Icone={Receipt} rotulo="Ticket médio" valor={moeda(resumo.ticket_medio)} sub="valor médio por venda" />
             <Kpi
@@ -188,38 +191,36 @@ export default function Painel() {
             </Cartao>
 
             <Cartao titulo="Recebimento por forma de pagamento">
-              <div className="flex flex-col gap-3 pt-1">
+              <div className="flex flex-col gap-4">
                 {porForma.map((x) => {
                   const pct = (x.total / totalRecebido) * 100;
+                  const I = FORMAS[x.forma].Icone;
                   return (
                     <div key={x.forma}>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-[13px] font-semibold flex items-center gap-2">
-                          {(() => {
-                            const I = FORMAS[x.forma].Icone;
-                            return <I size={15} strokeWidth={1.75} className="text-grafite-medio" />;
-                          })()}
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[14px] font-semibold flex items-center gap-2">
+                          <I size={16} strokeWidth={1.75} className="text-grafite-medio" />
                           {FORMAS[x.forma].rotulo}
                         </span>
-                        <span className="text-[13px] font-bold tabular-nums">{moeda(x.total)}</span>
+                        <span className="text-[14px] font-bold tabular-nums">{moeda(x.total)}</span>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-3">
                         <div className="flex-1 h-1.5 bg-concreto rounded-full overflow-hidden">
                           <div
                             className="h-full rounded-full"
                             style={{ width: `${pct}%`, background: FORMAS[x.forma].cor }}
                           />
                         </div>
-                        <span className="text-[11px] text-grafite-medio tabular-nums w-8 text-right">
+                        <span className="text-[12px] text-grafite-medio tabular-nums w-9 text-right">
                           {Math.round(pct)}%
                         </span>
                       </div>
                     </div>
                   );
                 })}
-                <div className="flex items-center justify-between pt-2 mt-1 border-t border-linha">
-                  <span className="text-[12px] text-grafite-medio font-semibold">Total recebido</span>
-                  <span className="text-[14px] font-bold tabular-nums">{moeda(totalRecebido)}</span>
+                <div className="flex items-center justify-between pt-3 border-t border-linha">
+                  <span className="text-[13px] text-grafite-medio font-semibold">Total recebido</span>
+                  <span className="text-[15px] font-bold tabular-nums">{moeda(totalRecebido)}</span>
                 </div>
               </div>
             </Cartao>
@@ -260,27 +261,27 @@ export default function Painel() {
           <Cartao titulo="Vendas recentes" acao="Ver todas as vendas" onAcao={() => navigate('/vendas')}>
             <table className="w-full">
               <thead>
-                <tr className="text-[10.5px] font-bold tracking-[0.08em] uppercase text-grafite-medio">
-                  <th className="text-left py-2 font-bold">Cliente</th>
-                  <th className="text-left py-2 font-bold">Pagamento</th>
-                  <th className="text-left py-2 font-bold">Data</th>
-                  <th className="text-right py-2 font-bold">Valor</th>
+                <tr className="text-[11px] font-bold tracking-[0.08em] uppercase text-grafite-medio">
+                  <th className="text-left pb-3 font-bold">Cliente</th>
+                  <th className="text-left pb-3 font-bold">Pagamento</th>
+                  <th className="text-left pb-3 font-bold">Data</th>
+                  <th className="text-right pb-3 font-bold">Valor</th>
                 </tr>
               </thead>
               <tbody>
                 {recentes.map((v) => (
-                  <tr key={v.id} className="border-t border-linha text-[13px]">
-                    <td className="py-2.5 font-semibold">{v.cliente_nome || 'Consumidor'}</td>
-                    <td className="py-2.5">
-                      <span className="inline-flex items-center gap-1.5 text-grafite-medio">
+                  <tr key={v.id} className="border-t border-linha text-[14px]">
+                    <td className="py-3 font-semibold">{v.cliente_nome || 'Consumidor'}</td>
+                    <td className="py-3">
+                      <span className="inline-flex items-center gap-2 text-grafite-medio">
                         <span className="w-2 h-2 rounded-full" style={{ background: FORMAS[v.forma_pagamento]?.cor }} />
                         {FORMAS[v.forma_pagamento]?.rotulo || v.forma_pagamento}
                       </span>
                     </td>
-                    <td className="py-2.5 text-grafite-medio tabular-nums">
+                    <td className="py-3 text-grafite-medio tabular-nums">
                       {new Date(v.vendida_em).toLocaleDateString('pt-BR')}
                     </td>
-                    <td className="py-2.5 text-right font-bold tabular-nums">{moeda(v.valor_total)}</td>
+                    <td className="py-3 text-right font-bold tabular-nums">{moeda(v.valor_total)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -298,10 +299,10 @@ function Cartao({ titulo, acao, onAcao, children }) {
   return (
     <div className="bg-superficie border border-linha rounded-md px-5 py-4">
       {titulo && (
-        <div className="flex items-center justify-between mb-3">
-          <p className="text-[13.5px] font-semibold text-grafite">{titulo}</p>
+        <div className="flex items-center justify-between mb-4">
+          <p className="text-[15px] font-semibold text-grafite">{titulo}</p>
           {acao && (
-            <button onClick={onAcao} className="text-[12px] font-semibold text-grafite-medio hover:text-grafite">
+            <button onClick={onAcao} className="text-[12.5px] font-semibold text-grafite-medio hover:text-grafite">
               {acao}
             </button>
           )}
@@ -316,29 +317,40 @@ function Kpi({ Icone, rotulo, valor, sub, chip, sentido, destaque = false }) {
   const corChip = sentido === 'sobe' ? 'bg-nivel/10 text-nivel' : 'bg-prumo/10 text-prumo';
   const seta = sentido === 'sobe' ? '↗' : '↘';
   return (
+    // 3 zonas de ALTURA FIXA para os 4 cards baterem exatamente:
+    // topo (24px), número (36px, ancorado na base), rodapé (20px).
     <div className="relative overflow-hidden bg-superficie border border-linha rounded-md px-5 py-4">
       {destaque && <div className="absolute left-0 top-0 bottom-0 w-1 bg-trena" />}
-      <div className="flex items-start justify-between">
-        <p className="text-[10.5px] font-bold tracking-[0.08em] uppercase text-grafite-medio">{rotulo}</p>
+
+      {/* topo: rótulo + ícone */}
+      <div className="h-[24px] flex items-start justify-between">
+        <p className="text-[10.5px] font-bold tracking-[0.08em] uppercase text-grafite-medio leading-tight">
+          {rotulo}
+        </p>
         {Icone && <Icone size={17} strokeWidth={1.75} className="text-grafite-medio/50 shrink-0" />}
       </div>
-      {/* Só o KPI em destaque usa a fonte pesada (Archivo Black). Os demais
-          usam Archivo semibold — hierarquia: um único ponto focal. */}
-      <p
-        className={`leading-none mt-2 tabular-nums tracking-[-0.02em] ${
-          destaque
-            ? 'font-display text-[30px]'
-            : 'font-ui font-semibold text-[26px] text-grafite'
-        }`}
-      >
-        {valor}
-      </p>
-      {chip && (
-        <span className={`inline-block mt-2 px-2 py-0.5 rounded text-[11px] font-bold tabular-nums ${corChip}`}>
-          {seta} {chip}
-        </span>
-      )}
-      {sub && <p className="text-[11.5px] text-grafite-medio mt-2">{sub}</p>}
+
+      {/* número: zona de altura fixa, ancorado na base (mesma baseline p/ todos) */}
+      <div className="h-[36px] flex items-end">
+        <p
+          className={`leading-none tabular-nums tracking-[-0.02em] text-[28px] ${
+            destaque ? 'font-display' : 'font-ui font-bold text-grafite'
+          }`}
+        >
+          {valor}
+        </p>
+      </div>
+
+      {/* rodapé: chip OU subtexto, sempre na mesma posição */}
+      <div className="h-[20px] mt-2.5 flex items-center">
+        {chip ? (
+          <span className={`px-2 py-0.5 rounded text-[11px] font-bold tabular-nums ${corChip}`}>
+            {seta} {chip}
+          </span>
+        ) : sub ? (
+          <p className="text-[12px] text-grafite-medio">{sub}</p>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -346,20 +358,20 @@ function Kpi({ Icone, rotulo, valor, sub, chip, sentido, destaque = false }) {
 // Linha de ranking com barra de proporção sob o nome.
 function LinhaBarra({ pos, nome, meta, valor, proporcao, cor }) {
   return (
-    <div className="flex items-center gap-3 py-2.5 border-b border-linha last:border-b-0">
-      <span className="w-4 font-ui font-semibold text-[12px] text-grafite-medio tabular-nums text-center shrink-0">
+    <div className="flex items-center gap-4 py-3 border-b border-linha last:border-b-0">
+      <span className="w-5 font-ui font-semibold text-[13px] text-grafite-medio tabular-nums text-center shrink-0">
         {pos}
       </span>
       <div className="flex-1 min-w-0">
-        <p className="text-[13px] font-semibold truncate mb-1">{nome}</p>
+        <p className="text-[14px] font-semibold truncate mb-1.5">{nome}</p>
         <div className="h-1 bg-concreto rounded-full overflow-hidden">
           <div className="h-full rounded-full" style={{ width: `${Math.max(proporcao * 100, 3)}%`, background: cor }} />
         </div>
       </div>
-      <span className="text-[11.5px] text-grafite-medio tabular-nums whitespace-nowrap w-20 text-right">
+      <span className="text-[12px] text-grafite-medio tabular-nums whitespace-nowrap w-20 text-right">
         {meta}
       </span>
-      <span className="text-[13px] font-bold tabular-nums whitespace-nowrap w-24 text-right">{valor}</span>
+      <span className="text-[14px] font-bold tabular-nums whitespace-nowrap w-24 text-right">{valor}</span>
     </div>
   );
 }

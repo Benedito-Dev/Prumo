@@ -2,15 +2,20 @@
 @import url('https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Archivo+Black&display=swap');
 @import 'tailwindcss';
 
-/* ---------- Design System do Prumo (tokens) ---------- */
-/* Fonte da verdade: docs/prumo-design-system.html */
+/* dark mode acionado por classe .dark no <html> */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ---------- Design System do Prumo ---------- */
+/* Cores neutras (superfície) apontam para variáveis que trocam no tema.
+   Cores de marca (trena/nível/prumo) são fixas nos dois temas. */
 @theme {
-  --color-concreto: #e6e9eb;
-  --color-concreto-fundo: #dde1e4;
-  --color-superficie: #ffffff;
-  --color-grafite: #16191d;
-  --color-grafite-medio: #565d66;
-  --color-linha: #c7cdd1;
+  --color-concreto: var(--c-concreto);
+  --color-concreto-fundo: var(--c-concreto-fundo);
+  --color-superficie: var(--c-superficie);
+  --color-grafite: var(--c-grafite);
+  --color-grafite-medio: var(--c-grafite-medio);
+  --color-linha: var(--c-linha);
+
   --color-trena: #ffc400;
   --color-trena-escuro: #d9a500;
   --color-nivel: #1b7a46;
@@ -23,6 +28,26 @@
   --radius-g: 10px;
 }
 
+/* tema claro (padrão) */
+:root {
+  --c-concreto: #e6e9eb;
+  --c-concreto-fundo: #dde1e4;
+  --c-superficie: #ffffff;
+  --c-grafite: #16191d;
+  --c-grafite-medio: #565d66;
+  --c-linha: #c7cdd1;
+}
+
+/* tema escuro */
+.dark {
+  --c-concreto-fundo: #0f1114; /* fundo geral */
+  --c-superficie: #1a1e23;     /* cartões */
+  --c-concreto: #262b31;       /* trilhos/realces sutis */
+  --c-grafite: #eef1f3;        /* texto principal (invertido) */
+  --c-grafite-medio: #9aa2ab;  /* texto secundário */
+  --c-linha: #2e343b;          /* bordas */
+}
+
 /* ---------- Base ---------- */
 body {
   margin: 0;
@@ -30,4 +55,27 @@ body {
   color: var(--color-grafite);
   font-family: var(--font-ui);
   -webkit-font-smoothing: antialiased;
+}
+
+/* ---------- Animações ---------- */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* fade-in suave (usado no tooltip do gráfico) */
+.animar-surgir {
+  animation: fade-in 0.15s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animar-surgir {
+    animation: none;
+  }
 }

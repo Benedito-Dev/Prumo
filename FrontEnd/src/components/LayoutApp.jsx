@@ -1,6 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Receipt, Users, Package, LogOut } from 'lucide-react';
+import { LayoutDashboard, Receipt, Users, Package, LogOut, Sun, Moon } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
+import { useTheme } from '../theme/ThemeContext';
 
 // Layout das telas internas (web/desktop): sidebar fixa à esquerda +
 // área de conteúdo à direita. Cada item de navegação tem ícone e rótulo.
@@ -13,6 +14,7 @@ const NAV = [
 
 export default function LayoutApp({ titulo, periodo, acao, children }) {
   const { usuario, sair } = useAuth();
+  const { escuro, alternar } = useTheme();
   const navigate = useNavigate();
 
   async function aoSair() {
@@ -22,12 +24,12 @@ export default function LayoutApp({ titulo, periodo, acao, children }) {
 
   return (
     <div className="min-h-screen bg-concreto-fundo flex">
-      {/* ---------- SIDEBAR ---------- */}
-      <aside className="w-[210px] shrink-0 bg-grafite text-superficie flex flex-col fixed inset-y-0 left-0">
+      {/* ---------- SIDEBAR (sempre escura, nos dois temas) ---------- */}
+      <aside className="w-[210px] shrink-0 bg-[#16191d] text-white flex flex-col fixed inset-y-0 left-0">
         {/* marca */}
         <div className="px-5 py-4 flex items-center gap-2.5 border-b border-white/10">
-          <div className="relative w-[3px] h-6 bg-superficie">
-            <span className="absolute left-1/2 -translate-x-1/2 -bottom-1.5 w-0 h-0 border-x-[4px] border-x-transparent border-t-[7px] border-t-superficie" />
+          <div className="relative w-[3px] h-6 bg-white">
+            <span className="absolute left-1/2 -translate-x-1/2 -bottom-1.5 w-0 h-0 border-x-[4px] border-x-transparent border-t-[7px] border-t-white" />
           </div>
           <span className="font-display text-[18px] tracking-tight">PRUMO</span>
         </div>
@@ -42,8 +44,8 @@ export default function LayoutApp({ titulo, periodo, acao, children }) {
               className={({ isActive }) =>
                 `flex items-center gap-2.5 px-3 py-2 rounded-p text-[13.5px] font-semibold transition-colors
                  ${isActive
-                   ? 'bg-white/10 text-superficie shadow-[inset_3px_0_0_var(--color-trena)]'
-                   : 'text-[#A8B0B8] hover:bg-white/5 hover:text-superficie'}`
+                   ? 'bg-white/10 text-white shadow-[inset_3px_0_0_var(--color-trena)]'
+                   : 'text-[#A8B0B8] hover:bg-white/5 hover:text-white'}`
               }
             >
               <item.Icone size={17} strokeWidth={2} className="shrink-0" />
@@ -60,7 +62,7 @@ export default function LayoutApp({ titulo, periodo, acao, children }) {
                 {usuario.nome.charAt(0).toUpperCase()}
               </span>
               <div className="min-w-0">
-                <p className="text-[13px] font-semibold text-superficie truncate">
+                <p className="text-[13px] font-semibold text-white truncate">
                   {usuario.nome}
                 </p>
                 <p className="text-[11px] text-[#A8B0B8] capitalize">{usuario.papel}</p>
@@ -69,7 +71,7 @@ export default function LayoutApp({ titulo, periodo, acao, children }) {
           )}
           <button
             onClick={aoSair}
-            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-p text-[13px] font-semibold text-[#A8B0B8] hover:bg-white/5 hover:text-superficie transition-colors"
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-p text-[13px] font-semibold text-[#A8B0B8] hover:bg-white/5 hover:text-white transition-colors"
           >
             <LogOut size={16} strokeWidth={2} className="shrink-0" />
             Sair
@@ -89,7 +91,16 @@ export default function LayoutApp({ titulo, periodo, acao, children }) {
               </span>
             )}
           </div>
-          {acao}
+          <div className="flex items-center gap-3">
+            {acao}
+            <button
+              onClick={alternar}
+              title={escuro ? 'Tema claro' : 'Tema escuro'}
+              className="w-8 h-8 flex items-center justify-center rounded-p border border-linha text-grafite-medio hover:text-grafite hover:bg-concreto transition-colors"
+            >
+              {escuro ? <Sun size={16} strokeWidth={2} /> : <Moon size={16} strokeWidth={2} />}
+            </button>
+          </div>
         </header>
 
         {/* conteúdo */}

@@ -58,7 +58,7 @@ export default function LayoutApp({ titulo, periodo, acao, children }) {
         <div className="px-2.5 py-3 border-t border-white/10">
           {usuario?.nome && (
             <div className="flex items-center gap-2.5 px-3 py-1.5 mb-0.5">
-              <span className="w-8 h-8 rounded-full bg-trena text-grafite font-bold text-[13px] flex items-center justify-center shrink-0">
+              <span className="w-8 h-8 rounded-full bg-trena text-white font-bold text-[13px] flex items-center justify-center shrink-0">
                 {usuario.nome.charAt(0).toUpperCase()}
               </span>
               <div className="min-w-0">

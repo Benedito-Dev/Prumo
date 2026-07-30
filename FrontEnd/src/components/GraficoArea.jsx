@@ -4,7 +4,7 @@
 import { useRef, useState } from 'react';
 import { moedaCurta, moeda } from '../utils/formato';
 
-export default function GraficoArea({ dados = [], cor = '#D9A500' }) {
+export default function GraficoArea({ dados = [], cor = '#0E7C86' }) {
   const areaRef = useRef(null);
   const [hover, setHover] = useState(null); // índice do ponto sob o mouse
 

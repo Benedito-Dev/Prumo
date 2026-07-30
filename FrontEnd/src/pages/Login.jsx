@@ -90,7 +90,7 @@ export default function Login() {
               <h1 className="font-display text-[clamp(60px,9vw,104px)] leading-[0.9] tracking-[-0.03em] m-0 drop-shadow-[0_2px_12px_rgba(0,0,0,0.4)]">
                 PRUMO
               </h1>
-              <span className="inline-block mt-5 bg-trena text-grafite font-bold text-[13px] tracking-[0.1em] uppercase px-4 py-2">
+              <span className="inline-block mt-5 bg-trena text-white font-bold text-[13px] tracking-[0.1em] uppercase px-4 py-2">
                 Seu depósito no prumo
               </span>
             </div>

@@ -43,20 +43,46 @@ export async function faturamento(req, res) {
 export async function resumo(req, res) {
   try {
     const { de, ate } = resolverPeriodo(req.query);
+
+    // Período anterior de mesma duração (para comparar tendência).
+    const dur = new Date(ate) - new Date(de);
+    const antDe = new Date(new Date(de) - dur).toISOString();
+    const antAte = de;
+
     const sql = `
       SELECT
         COALESCE(SUM(valor_total), 0) AS total,
         COUNT(*)                      AS qtd_vendas,
-        COALESCE(AVG(valor_total), 0) AS ticket_medio
+        COALESCE(AVG(valor_total), 0) AS ticket_medio,
+        COUNT(DISTINCT cliente_id)    AS clientes
       FROM venda
       WHERE status = 'concluida' AND vendida_em >= $1 AND vendida_em < $2
     `;
-    const r = await query(sql, [de, ate]);
+    const [atual, anterior] = await Promise.all([
+      query(sql, [de, ate]),
+      query(sql, [antDe, antAte]),
+    ]);
+
+    const a = atual.rows[0];
+    const b = anterior.rows[0];
+
+    // variação percentual; null quando não há base de comparação (>0)
+    const varPct = (novo, velho) =>
+      Number(velho) > 0 ? Number((((novo - velho) / velho) * 100).toFixed(1)) : null;
+
     res.json({
       periodo: { de, ate },
-      total: Number(r.rows[0].total),
-      qtd_vendas: Number(r.rows[0].qtd_vendas),
-      ticket_medio: Number(Number(r.rows[0].ticket_medio).toFixed(2)),
+      total: Number(a.total),
+      qtd_vendas: Number(a.qtd_vendas),
+      ticket_medio: Number(Number(a.ticket_medio).toFixed(2)),
+      clientes: Number(a.clientes),
+      // variações vs. período anterior
+      variacao: {
+        total: varPct(Number(a.total), Number(b.total)),
+        qtd_vendas: varPct(Number(a.qtd_vendas), Number(b.qtd_vendas)),
+        ticket_medio: varPct(Number(a.ticket_medio), Number(b.ticket_medio)),
+        clientes: varPct(Number(a.clientes), Number(b.clientes)),
+      },
     });
   } catch (erro) {
     res.status(500).json({ erro: 'Falha ao calcular resumo', detalhe: erro.message });

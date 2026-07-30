@@ -87,7 +87,7 @@ export default function Painel() {
       </div>
       <button
         onClick={() => navigate('/vendas/nova')}
-        className="h-8 px-4 rounded-p bg-trena hover:bg-trena-escuro text-grafite font-bold text-[13px] transition-colors"
+        className="h-8 px-4 rounded-p bg-trena hover:bg-trena-escuro text-white font-bold text-[13px] transition-colors"
       >
         + Nova venda
       </button>
@@ -125,15 +125,23 @@ export default function Painel() {
     return { rotulo: d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }), valor: e.total };
   });
 
-  const variacao =
-    faturamento.variacao_pct == null ? null : `${Math.abs(faturamento.variacao_pct)}% vs mês anterior`;
-  const sentido =
-    faturamento.variacao_pct == null ? null : faturamento.variacao_pct >= 0 ? 'sobe' : 'desce';
+  // Tendência de cada KPI vs. período anterior (seta + %).
+  // Estável quando |variação| < 1%. null = sem base de comparação.
+  const tendencia = (pct) => {
+    if (pct == null) return {};
+    const sentido = Math.abs(pct) < 1 ? 'estavel' : pct > 0 ? 'sobe' : 'desce';
+    return { chip: `${Math.abs(pct)}%`, sentido };
+  };
+  const v = resumo.variacao || {};
+  const tFat = tendencia(v.total);
+  const tTicket = tendencia(v.ticket_medio);
+  const tVendas = tendencia(v.qtd_vendas);
+  const tClientes = tendencia(v.clientes);
 
   // sub-informações dos KPIs
   const diasNoPeriodo = Math.max(serie.length, 1);
   const porDia = resumo.total / diasNoPeriodo;
-  const clientesDistintos = new Set(vendas.filter((v) => v.cliente_id).map((v) => v.cliente_id)).size;
+  const clientesDistintos = resumo.clientes ?? 0;
   const comprasPorCliente = clientesDistintos ? resumo.qtd_vendas / clientesDistintos : 0;
 
   const maxCliente = Math.max(...ranking.map((c) => Number(c.total_gasto)), 1);
@@ -163,21 +171,32 @@ export default function Painel() {
               rotulo="Faturamento do período"
               valor={moeda(resumo.total)}
               destaque
-              chip={variacao}
-              sentido={sentido}
-              sub={variacao ? undefined : `${moeda(porDia)} por dia em média`}
+              chip={tFat.chip}
+              sentido={tFat.sentido}
+              sub={`${moeda(porDia)} por dia em média`}
             />
-            <Kpi Icone={Receipt} rotulo="Ticket médio" valor={moeda(resumo.ticket_medio)} sub="valor médio por venda" />
+            <Kpi
+              Icone={Receipt}
+              rotulo="Ticket médio"
+              valor={moeda(resumo.ticket_medio)}
+              chip={tTicket.chip}
+              sentido={tTicket.sentido}
+              sub="valor médio por venda"
+            />
             <Kpi
               Icone={ShoppingCart}
               rotulo="Vendas realizadas"
               valor={numero(resumo.qtd_vendas)}
+              chip={tVendas.chip}
+              sentido={tVendas.sentido}
               sub={`${moeda(porDia)} por dia em média`}
             />
             <Kpi
               Icone={Users}
               rotulo="Clientes distintos"
               valor={numero(clientesDistintos)}
+              chip={tClientes.chip}
+              sentido={tClientes.sentido}
               sub={`${comprasPorCliente.toFixed(1)} compras por cliente`}
             />
           </div>
@@ -251,7 +270,7 @@ export default function Painel() {
                   meta={`${numero(p.quantidade_total)} un.`}
                   valor={moeda(p.valor_total)}
                   proporcao={Number(p.valor_total) / maxProduto}
-                  cor="#D9A500"
+                  cor="#0E7C86"
                 />
               ))}
             </Cartao>
@@ -314,13 +333,22 @@ function Cartao({ titulo, acao, onAcao, children }) {
 }
 
 function Kpi({ Icone, rotulo, valor, sub, chip, sentido, destaque = false }) {
-  const corChip = sentido === 'sobe' ? 'bg-nivel/10 text-nivel' : 'bg-prumo/10 text-prumo';
-  const seta = sentido === 'sobe' ? '↗' : '↘';
+  // sentido: 'sobe' (verde) | 'desce' (vermelho) | 'estavel' (cinza)
+  const corChip =
+    sentido === 'sobe'
+      ? 'bg-nivel/10 text-nivel'
+      : sentido === 'desce'
+        ? 'bg-prumo/10 text-prumo'
+        : 'bg-grafite-medio/10 text-grafite-medio';
+  const seta = sentido === 'sobe' ? '↗' : sentido === 'desce' ? '↘' : '→';
+
   return (
     // 3 zonas de ALTURA FIXA para os 4 cards baterem exatamente:
-    // topo (24px), número (36px, ancorado na base), rodapé (20px).
-    <div className="relative overflow-hidden bg-superficie border border-linha rounded-md px-5 py-4">
-      {destaque && <div className="absolute left-0 top-0 bottom-0 w-1 bg-trena" />}
+    // topo (24px), número+chip (36px), rodapé subtexto (20px).
+    // O card de destaque (faturamento) tem fundo verde claro.
+    <div className="relative overflow-hidden rounded-md px-5 py-4 border bg-superficie border-linha">
+      {/* card de destaque: só o acento lateral verde, fundo branco como os demais */}
+      {destaque && <div className="absolute left-0 top-0 bottom-0 w-1 bg-nivel" />}
 
       {/* topo: rótulo + ícone */}
       <div className="h-[24px] flex items-start justify-between">
@@ -330,26 +358,21 @@ function Kpi({ Icone, rotulo, valor, sub, chip, sentido, destaque = false }) {
         {Icone && <Icone size={17} strokeWidth={1.75} className="text-grafite-medio/50 shrink-0" />}
       </div>
 
-      {/* número: zona de altura fixa, ancorado na base (mesma baseline p/ todos) */}
-      <div className="h-[36px] flex items-end">
-        <p
-          className={`leading-none tabular-nums tracking-[-0.02em] text-[28px] ${
-            destaque ? 'font-display' : 'font-ui font-bold text-grafite'
-          }`}
-        >
+      {/* número + chip de tendência ao lado */}
+      <div className="h-[36px] flex items-end gap-2">
+        <p className="leading-none tabular-nums tracking-[-0.01em] text-[27px] text-grafite font-ui font-bold">
           {valor}
         </p>
-      </div>
-
-      {/* rodapé: chip OU subtexto, sempre na mesma posição */}
-      <div className="h-[20px] mt-2.5 flex items-center">
-        {chip ? (
-          <span className={`px-2 py-0.5 rounded text-[11px] font-bold tabular-nums ${corChip}`}>
+        {chip && (
+          <span className={`mb-0.5 px-1.5 py-0.5 rounded text-[11px] font-bold tabular-nums ${corChip}`}>
             {seta} {chip}
           </span>
-        ) : sub ? (
-          <p className="text-[12px] text-grafite-medio">{sub}</p>
-        ) : null}
+        )}
+      </div>
+
+      {/* rodapé: subtexto */}
+      <div className="h-[20px] mt-2.5 flex items-center">
+        {sub && <p className="text-[12px] text-grafite-medio">{sub}</p>}
       </div>
     </div>
   );

@@ -3,7 +3,7 @@
 // perigo, texto. Regra: uma ação amarela (primário) por tela.
 const VARIANTES = {
   primario:
-    'w-full min-h-[64px] bg-trena text-grafite text-[19px] hover:bg-trena-escuro',
+    'w-full min-h-[64px] bg-trena text-white text-[19px] hover:bg-trena-escuro',
   secundario:
     'min-h-[56px] bg-superficie text-grafite border-2 border-grafite hover:bg-concreto',
   perigo:

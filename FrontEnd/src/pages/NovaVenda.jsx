@@ -20,6 +20,7 @@ export default function NovaVenda() {
   const [cliente, setCliente] = useState(null); // null = Consumidor
   const [itens, setItens] = useState([]); // { produto_id, nome, unidade, quantidade, preco_unitario }
   const [pagamento, setPagamento] = useState('dinheiro');
+  const [recebido, setRecebido] = useState(''); // valor em dinheiro recebido (troco)
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState('');
   const [modalCliente, setModalCliente] = useState(false);
@@ -37,6 +38,8 @@ export default function NovaVenda() {
       : Number(descontoInput) || 0;
   const desconto = Math.min(Math.max(descontoBruto, 0), subtotal);
   const total = subtotal - desconto;
+  // troco (só faz sentido no dinheiro): recebido − total
+  const troco = Number(recebido) - total;
 
   function adicionarProduto(p) {
     // se já existe, incrementa; senão adiciona
@@ -110,6 +113,7 @@ export default function NovaVenda() {
     setItens([]);
     setPagamento('dinheiro');
     setDescontoInput('');
+    setRecebido('');
     setErro('');
     setVendaSalva(null);
   }
@@ -319,6 +323,54 @@ export default function NovaVenda() {
                 </button>
               ))}
             </div>
+
+            {/* troco — só no dinheiro */}
+            {pagamento === 'dinheiro' && total > 0 && (
+              <div className="mt-3 flex flex-col gap-2">
+                <div>
+                  <p className="text-[11px] font-semibold text-grafite-medio mb-1">Valor recebido</p>
+                  <div className="flex items-center border-2 border-linha rounded-p px-3 focus-within:border-grafite">
+                    <span className="text-[13px] text-grafite-medio shrink-0">R$</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={recebido}
+                      onChange={(e) => setRecebido(e.target.value)}
+                      placeholder={total.toFixed(2)}
+                      className="w-full min-w-0 py-2 pl-2 text-right text-[14px] font-semibold tabular-nums bg-transparent outline-none"
+                    />
+                  </div>
+                </div>
+                {/* atalhos de cédulas comuns */}
+                <div className="flex flex-wrap gap-1.5">
+                  {[total, 50, 100, 200].map((v, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setRecebido(v.toFixed(2))}
+                      className="px-2.5 py-1 rounded-p border border-linha text-[12px] font-semibold text-grafite-medio hover:border-grafite hover:text-grafite tabular-nums"
+                    >
+                      {i === 0 ? 'Exato' : moeda(v)}
+                    </button>
+                  ))}
+                </div>
+                {/* troco calculado */}
+                {recebido !== '' && (
+                  <div
+                    className={`flex items-center justify-between rounded-p px-3 py-2 ${
+                      troco < 0 ? 'bg-prumo/10' : 'bg-nivel/10'
+                    }`}
+                  >
+                    <span className={`text-[13px] font-semibold ${troco < 0 ? 'text-prumo' : 'text-nivel'}`}>
+                      {troco < 0 ? 'Falta' : 'Troco'}
+                    </span>
+                    <span className={`text-[16px] font-bold tabular-nums ${troco < 0 ? 'text-prumo' : 'text-nivel'}`}>
+                      {moeda(Math.abs(troco))}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {erro && (

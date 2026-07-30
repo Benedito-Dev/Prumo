@@ -214,6 +214,7 @@ export const openapiSpec = {
     { name: 'Produtos', description: 'Catálogo de produtos (RF06–RF09)' },
     { name: 'Usuários', description: 'Usuários do sistema (RF13)' },
     { name: 'Vendas', description: 'Registro de vendas — o núcleo (RF10–RF14)' },
+    { name: 'Fiados', description: 'Contas a receber — vendas fiado em aberto e pagamentos' },
     { name: 'Painel', description: 'Indicadores do painel (RF16–RF22)' },
   ],
   components: {
@@ -563,7 +564,7 @@ export const openapiSpec = {
     '/vendas': {
       get: {
         tags: ['Vendas'],
-        summary: 'Lista vendas (filtro de período)',
+        summary: 'Lista vendas (filtros de período, status e cliente)',
         parameters: [
           { name: 'de', in: 'query', schema: { type: 'string', format: 'date' } },
           { name: 'ate', in: 'query', schema: { type: 'string', format: 'date' } },
@@ -571,6 +572,12 @@ export const openapiSpec = {
             name: 'status',
             in: 'query',
             schema: { type: 'string', enum: ['concluida', 'cancelada'] },
+          },
+          {
+            name: 'cliente_id',
+            in: 'query',
+            schema: { type: 'string', format: 'uuid' },
+            description: 'Filtra as vendas de um cliente (histórico)',
           },
         ],
         responses: { 200: ok(listaDe('Venda')) },
@@ -615,6 +622,105 @@ export const openapiSpec = {
           }),
           404: erro('Não encontrada'),
           409: erro('Já está cancelada'),
+        },
+      },
+    },
+
+    // ---------------- FIADOS ----------------
+    '/fiados': {
+      get: {
+        tags: ['Fiados'],
+        summary: 'Vendas fiado em aberto (com saldo devedor)',
+        description: 'Só vendas concluídas com forma_pagamento=fiado e saldo > 0. Mais antigas primeiro.',
+        responses: {
+          200: ok({
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                id: { type: 'string', format: 'uuid', description: 'id da venda' },
+                cliente_id: { type: 'string', format: 'uuid', nullable: true },
+                cliente_nome: { type: 'string' },
+                cliente_telefone: { type: 'string', nullable: true },
+                valor_total: { type: 'number' },
+                pago: { type: 'number' },
+                saldo: { type: 'number', description: 'valor_total − pago' },
+                dias: { type: 'integer', description: 'dias desde a venda' },
+                vendida_em: { type: 'string', format: 'date-time' },
+              },
+            },
+          }),
+        },
+      },
+    },
+    '/fiados/resumo': {
+      get: {
+        tags: ['Fiados'],
+        summary: 'Total a receber e nº de dívidas em aberto',
+        responses: {
+          200: ok({
+            type: 'object',
+            properties: {
+              total_receber: { type: 'number' },
+              qtd: { type: 'integer' },
+            },
+          }),
+        },
+      },
+    },
+    '/fiados/{vendaId}/pagamentos': {
+      get: {
+        tags: ['Fiados'],
+        summary: 'Histórico de quitações de uma venda fiado',
+        parameters: [
+          { name: 'vendaId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+        ],
+        responses: {
+          200: ok({
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                id: { type: 'string', format: 'uuid' },
+                valor: { type: 'number' },
+                usuario_nome: { type: 'string', nullable: true },
+                pago_em: { type: 'string', format: 'date-time' },
+              },
+            },
+          }),
+        },
+      },
+    },
+    '/fiados/{vendaId}/pagar': {
+      post: {
+        tags: ['Fiados'],
+        summary: 'Registra um pagamento (parcial ou total) de um fiado',
+        parameters: [
+          { name: 'vendaId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['valor'],
+                properties: { valor: { type: 'number', example: 300 } },
+              },
+            },
+          },
+        },
+        responses: {
+          201: ok({
+            type: 'object',
+            properties: {
+              pago: { type: 'number' },
+              saldo: { type: 'number', description: 'saldo restante após o pagamento' },
+              quitado: { type: 'boolean' },
+            },
+          }, 'Pagamento registrado'),
+          400: erro('Valor inválido, excede o saldo ou venda não é fiado em aberto'),
+          404: erro('Venda não encontrada'),
         },
       },
     },

@@ -5,20 +5,29 @@ import LayoutApp from '../components/LayoutApp';
 import { clientesService, rotuloTipo, DIAS_SUMIDO } from '../services/clientes';
 import { moeda } from '../utils/formato';
 
+const FORMAS = { dinheiro: 'Dinheiro', pix: 'Pix', cartao: 'Cartão', fiado: 'Fiado' };
+const CORES_FORMA = { dinheiro: '#1B7A46', pix: '#2AA9B8', cartao: '#7C6FE8', fiado: '#D9A500' };
+
 export default function ClienteDetalhe() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [cliente, setCliente] = useState(null);
+  const [historico, setHistorico] = useState([]);
   const [carregando, setCarregando] = useState(true);
 
   useEffect(() => {
     let ativo = true;
     (async () => {
       try {
-        // usa o endpoint de estatísticas e encontra o cliente (traz total/compras)
-        const todos = await clientesService.estatisticas();
+        const [todos, vendas] = await Promise.all([
+          clientesService.estatisticas(),
+          clientesService.historico(id),
+        ]);
         const c = todos.find((x) => x.id === id) || (await clientesService.buscar(id));
-        if (ativo) setCliente(c);
+        if (ativo) {
+          setCliente(c);
+          setHistorico(vendas);
+        }
       } finally {
         if (ativo) setCarregando(false);
       }
@@ -107,21 +116,78 @@ export default function ClienteDetalhe() {
           </div>
         )}
 
-        {/* histórico de compras — FRONT montado; dados reais ligam depois */}
-        <div className="bg-superficie border border-linha rounded-md p-5 flex-1 flex flex-col min-h-0">
-          <div className="flex items-center gap-2 mb-3 shrink-0">
-            <ShoppingBag size={16} className="text-grafite-medio" />
-            <p className="text-[14px] font-semibold">Histórico de compras</p>
+        {/* histórico de compras (dados reais) */}
+        <div className="bg-superficie border border-linha rounded-md flex-1 flex flex-col min-h-0">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-linha shrink-0">
+            <div className="flex items-center gap-2">
+              <ShoppingBag size={16} className="text-grafite-medio" />
+              <p className="text-[14px] font-semibold">Histórico de compras</p>
+            </div>
+            <span className="text-[12px] text-grafite-medio">{historico.length} venda(s)</span>
           </div>
-          <div className="flex-1 min-h-0 border-2 border-dashed border-linha rounded-md flex flex-col items-center justify-center text-center px-6">
-            <ShoppingBag size={28} className="text-grafite-medio/30 mb-3" />
-            <p className="text-[13.5px] text-grafite-medio">
-              O histórico detalhado de compras deste cliente entra aqui.
-            </p>
-            <p className="text-[12px] text-grafite-medio/70 mt-1">
-              (a listagem por cliente será conectada ao back-end na próxima etapa)
-            </p>
-          </div>
+
+          {historico.length === 0 ? (
+            <div className="flex-1 flex flex-col items-center justify-center text-center px-6">
+              <ShoppingBag size={28} className="text-grafite-medio/30 mb-3" />
+              <p className="text-[13.5px] text-grafite-medio">
+                Este cliente ainda não tem compras registradas.
+              </p>
+            </div>
+          ) : (
+            <div className="flex-1 min-h-0 overflow-y-auto">
+              <table className="w-full">
+                <thead className="sticky top-0 bg-superficie">
+                  <tr className="text-[10.5px] font-bold tracking-[0.08em] uppercase text-grafite-medio border-b border-linha">
+                    <th className="text-left px-5 py-3">Data</th>
+                    <th className="text-left px-3 py-3">Pagamento</th>
+                    <th className="text-right px-3 py-3">Desconto</th>
+                    <th className="text-right px-5 py-3">Valor</th>
+                    <th className="text-center px-3 py-3">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {historico.map((v) => (
+                    <tr
+                      key={v.id}
+                      className={`text-[14px] border-b border-linha last:border-b-0 ${
+                        v.status === 'cancelada' ? 'opacity-55' : ''
+                      }`}
+                    >
+                      <td className="px-5 py-3 tabular-nums">
+                        {new Date(v.vendida_em).toLocaleDateString('pt-BR')}
+                      </td>
+                      <td className="px-3 py-3">
+                        <span className="inline-flex items-center gap-2 text-grafite-medio">
+                          <span
+                            className="w-2 h-2 rounded-full"
+                            style={{ background: CORES_FORMA[v.forma_pagamento] }}
+                          />
+                          {FORMAS[v.forma_pagamento] || v.forma_pagamento}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3 text-right text-grafite-medio tabular-nums">
+                        {Number(v.desconto) > 0 ? `− ${moeda(v.desconto)}` : '—'}
+                      </td>
+                      <td className="px-5 py-3 text-right font-bold tabular-nums">
+                        {moeda(v.valor_total)}
+                      </td>
+                      <td className="px-3 py-3 text-center">
+                        {v.status === 'cancelada' ? (
+                          <span className="text-[11px] font-bold uppercase text-prumo bg-prumo/10 px-2 py-0.5 rounded">
+                            cancelada
+                          </span>
+                        ) : (
+                          <span className="text-[11px] font-bold uppercase text-nivel bg-nivel/10 px-2 py-0.5 rounded">
+                            concluída
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
     </LayoutApp>

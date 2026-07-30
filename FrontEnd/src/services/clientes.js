@@ -15,6 +15,8 @@ export const clientesService = {
   criar: (dados) => api.post('/clientes', dados),
   atualizar: (id, dados) => api.put(`/clientes/${id}`, dados),
   remover: (id) => api.delete(`/clientes/${id}`),
+  // histórico de vendas do cliente (mais recentes primeiro)
+  historico: (id) => api.get(`/vendas?cliente_id=${id}`),
 };
 
 export function rotuloTipo(id) {

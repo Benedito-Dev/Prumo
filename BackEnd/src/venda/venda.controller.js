@@ -13,10 +13,10 @@ const SELECT_VENDA = `
     JOIN usuario u ON u.id = v.usuario_id
 `;
 
-// GET /api/vendas?de=YYYY-MM-DD&ate=YYYY-MM-DD&status=concluida
+// GET /api/vendas?de=YYYY-MM-DD&ate=YYYY-MM-DD&status=concluida&cliente_id=UUID
 export async function listarVendas(req, res) {
   try {
-    const { de, ate, status } = req.query;
+    const { de, ate, status, cliente_id } = req.query;
     const condicoes = [];
     const params = [];
 
@@ -32,6 +32,10 @@ export async function listarVendas(req, res) {
     if (status) {
       params.push(status);
       condicoes.push(`v.status = $${params.length}`);
+    }
+    if (cliente_id) {
+      params.push(cliente_id);
+      condicoes.push(`v.cliente_id = $${params.length}`);
     }
 
     const where = condicoes.length ? `WHERE ${condicoes.join(' AND ')}` : '';

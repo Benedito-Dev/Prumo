@@ -2,6 +2,7 @@
 import { Router } from 'express';
 import {
   listarClientes,
+  estatisticasClientes,
   buscarCliente,
   criarCliente,
   atualizarCliente,
@@ -10,7 +11,8 @@ import {
 
 const router = Router();
 
-router.get('/', listarClientes);       // ?busca= filtra por nome/telefone
+router.get('/', listarClientes);              // ?busca= filtra por nome/telefone
+router.get('/estatisticas', estatisticasClientes); // antes de /:id!
 router.get('/:id', buscarCliente);
 router.post('/', criarCliente);
 router.put('/:id', atualizarCliente);

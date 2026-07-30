@@ -26,6 +26,40 @@ export async function listarClientes(req, res) {
   }
 }
 
+// GET /api/clientes/estatisticas
+// Clientes com estatísticas de compra: total gasto, nº de compras e
+// última compra (LEFT JOIN — clientes sem compra também aparecem).
+// dias_sem_comprar ajuda a identificar "cliente sumido" (RF24).
+export async function estatisticasClientes(req, res) {
+  try {
+    const sql = `
+      SELECT
+        c.*,
+        COALESCE(SUM(v.valor_total), 0)                    AS total_gasto,
+        COUNT(v.id)                                        AS qtd_compras,
+        MAX(v.vendida_em)                                  AS ultima_compra,
+        CASE WHEN MAX(v.vendida_em) IS NOT NULL
+             THEN EXTRACT(DAY FROM NOW() - MAX(v.vendida_em))::int
+             ELSE NULL END                                 AS dias_sem_comprar
+      FROM cliente c
+      LEFT JOIN venda v ON v.cliente_id = c.id AND v.status = 'concluida'
+      GROUP BY c.id
+      ORDER BY total_gasto DESC, c.nome
+    `;
+    const r = await query(sql);
+    res.json(
+      r.rows.map((row) => ({
+        ...row,
+        total_gasto: Number(row.total_gasto),
+        qtd_compras: Number(row.qtd_compras),
+        dias_sem_comprar: row.dias_sem_comprar,
+      }))
+    );
+  } catch (erro) {
+    res.status(500).json({ erro: 'Falha ao carregar estatísticas', detalhe: erro.message });
+  }
+}
+
 // GET /api/clientes/:id
 export async function buscarCliente(req, res) {
   try {

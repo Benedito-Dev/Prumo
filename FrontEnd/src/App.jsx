@@ -2,6 +2,7 @@ import { Routes, Route } from 'react-router-dom';
 import Login from './pages/Login';
 import Painel from './pages/Painel';
 import NovaVenda from './pages/NovaVenda';
+import Vendas from './pages/Vendas';
 import Produtos from './pages/Produtos';
 import Clientes from './pages/Clientes';
 import ClienteDetalhe from './pages/ClienteDetalhe';
@@ -16,6 +17,14 @@ export default function App() {
         element={
           <RotaProtegida>
             <Painel />
+          </RotaProtegida>
+        }
+      />
+      <Route
+        path="/vendas"
+        element={
+          <RotaProtegida>
+            <Vendas />
           </RotaProtegida>
         }
       />

@@ -20,4 +20,16 @@ export const vendasService = {
 
   // lança a venda (transação no back-end)
   criarVenda: (dados) => api.post('/vendas', dados),
+
+  // histórico de vendas (com filtros de período/status)
+  listar: ({ de, ate, status } = {}) => {
+    const p = new URLSearchParams();
+    if (de) p.set('de', de);
+    if (ate) p.set('ate', ate);
+    if (status) p.set('status', status);
+    const qs = p.toString();
+    return api.get(`/vendas${qs ? `?${qs}` : ''}`);
+  },
+  detalhar: (id) => api.get(`/vendas/${id}`),
+  cancelar: (id) => api.patch(`/vendas/${id}/cancelar`),
 };

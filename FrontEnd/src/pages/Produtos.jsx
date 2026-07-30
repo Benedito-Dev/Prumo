@@ -4,7 +4,7 @@ import LayoutApp from '../components/LayoutApp';
 import { produtosService, UNIDADES, rotuloUnidade } from '../services/produtos';
 import { painelService } from '../services/painel';
 import { moeda } from '../utils/formato';
-import { X } from 'lucide-react';
+import { X, Check } from 'lucide-react';
 
 // Placeholder de imagem por categoria (até existir upload de foto real).
 // { emoji base + cor de fundo } conforme o nome da categoria/produto.
@@ -221,17 +221,39 @@ function CardProduto({ produto: p, tendencia, onEditar }) {
 }
 
 // ---------- Modal criar/editar produto ----------
-function ModalProduto({ produto, categorias, onFechar, onSalvo }) {
+function ModalProduto({ produto, categorias: categoriasIniciais, onFechar, onSalvo }) {
   const edicao = !!produto.id;
   const [nome, setNome] = useState(produto.nome || '');
   const [unidade, setUnidade] = useState(produto.unidade || 'saco');
   const [precoVenda, setPrecoVenda] = useState(produto.preco_venda || '');
   const [precoCusto, setPrecoCusto] = useState(produto.preco_custo || '');
+  const [categorias, setCategorias] = useState(categoriasIniciais);
   const [categoriaId, setCategoriaId] = useState(produto.categoria_id || '');
   const [imagemUrl, setImagemUrl] = useState(produto.imagem_url || '');
   const [ativo, setAtivo] = useState(produto.ativo ?? true);
   const [erro, setErro] = useState('');
   const [salvando, setSalvando] = useState(false);
+  // criação inline de categoria
+  const [criandoCat, setCriandoCat] = useState(false);
+  const [novaCat, setNovaCat] = useState('');
+  const [salvandoCat, setSalvandoCat] = useState(false);
+
+  async function criarCategoria() {
+    const nomeCat = novaCat.trim();
+    if (!nomeCat) return;
+    setSalvandoCat(true);
+    try {
+      const cat = await produtosService.criarCategoria(nomeCat);
+      setCategorias((atual) => [...atual, cat].sort((a, b) => a.nome.localeCompare(b.nome)));
+      setCategoriaId(cat.id); // já seleciona a nova
+      setNovaCat('');
+      setCriandoCat(false);
+    } catch (e) {
+      setErro(e.message || 'Falha ao criar categoria.');
+    } finally {
+      setSalvandoCat(false);
+    }
+  }
 
   async function salvar() {
     setErro('');
@@ -293,20 +315,67 @@ function ModalProduto({ produto, categorias, onFechar, onSalvo }) {
               ))}
             </select>
           </Campo>
-          <Campo rotulo="Categoria">
-            <select
-              value={categoriaId}
-              onChange={(e) => setCategoriaId(e.target.value)}
-              className={inputCls}
-            >
-              <option value="">Sem categoria</option>
-              {categorias.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.nome}
-                </option>
-              ))}
-            </select>
-          </Campo>
+          <label className="block min-w-0 mb-3">
+            <span className="flex items-center justify-between mb-1.5">
+              <span className="text-[11px] font-bold uppercase tracking-wide text-grafite-medio">
+                Categoria
+              </span>
+              {!criandoCat && (
+                <button
+                  type="button"
+                  onClick={() => setCriandoCat(true)}
+                  className="text-[11px] font-semibold text-trena hover:underline"
+                >
+                  + nova
+                </button>
+              )}
+            </span>
+            {criandoCat ? (
+              <div className="flex gap-1.5">
+                <input
+                  value={novaCat}
+                  onChange={(e) => setNovaCat(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), criarCategoria())}
+                  placeholder="Nome da categoria"
+                  autoFocus
+                  className="flex-1 min-w-0 py-2.5 px-3 text-[14px] border-2 border-linha rounded-p bg-superficie focus:border-grafite outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={criarCategoria}
+                  disabled={salvandoCat}
+                  className="px-3 rounded-p bg-trena text-white text-[13px] font-bold disabled:opacity-50"
+                  title="Salvar categoria"
+                >
+                  <Check size={16} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCriandoCat(false);
+                    setNovaCat('');
+                  }}
+                  className="px-3 rounded-p border border-linha text-grafite-medio"
+                  title="Cancelar"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            ) : (
+              <select
+                value={categoriaId}
+                onChange={(e) => setCategoriaId(e.target.value)}
+                className={inputCls}
+              >
+                <option value="">Sem categoria</option>
+                {categorias.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.nome}
+                  </option>
+                ))}
+              </select>
+            )}
+          </label>
         </div>
 
         <div className="grid grid-cols-2 gap-3">

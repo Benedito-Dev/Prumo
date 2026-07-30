@@ -108,12 +108,13 @@ export default function ClienteDetalhe() {
         )}
 
         {/* histórico de compras — FRONT montado; dados reais ligam depois */}
-        <div className="bg-superficie border border-linha rounded-md p-5">
-          <div className="flex items-center gap-2 mb-3">
+        <div className="bg-superficie border border-linha rounded-md p-5 flex-1 flex flex-col min-h-0">
+          <div className="flex items-center gap-2 mb-3 shrink-0">
             <ShoppingBag size={16} className="text-grafite-medio" />
             <p className="text-[14px] font-semibold">Histórico de compras</p>
           </div>
-          <div className="border-2 border-dashed border-linha rounded-md py-10 text-center">
+          <div className="flex-1 min-h-0 border-2 border-dashed border-linha rounded-md flex flex-col items-center justify-center text-center px-6">
+            <ShoppingBag size={28} className="text-grafite-medio/30 mb-3" />
             <p className="text-[13.5px] text-grafite-medio">
               O histórico detalhado de compras deste cliente entra aqui.
             </p>

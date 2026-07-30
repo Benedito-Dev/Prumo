@@ -1,15 +1,25 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, Users, X, AlertTriangle } from 'lucide-react';
+import { Plus, Search, Users, AlertTriangle, UserCheck, Wallet, UserPlus } from 'lucide-react';
 import LayoutApp from '../components/LayoutApp';
+import Seletor from '../components/Seletor';
 import { clientesService, TIPOS, rotuloTipo, DIAS_SUMIDO } from '../services/clientes';
-import { moeda } from '../utils/formato';
+import { moeda, numero } from '../utils/formato';
+
+const ORDENS = [
+  { id: 'total', rotulo: 'Maior gasto' },
+  { id: 'recente', rotulo: 'Compra recente' },
+  { id: 'nome', rotulo: 'Nome (A–Z)' },
+];
 
 export default function Clientes() {
   const navigate = useNavigate();
   const [clientes, setClientes] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [busca, setBusca] = useState('');
+  const [filtroTipo, setFiltroTipo] = useState(''); // '' = todos
+  const [soSumidos, setSoSumidos] = useState(false);
+  const [ordem, setOrdem] = useState('total');
   const [editando, setEditando] = useState(null); // cliente, {} (novo) ou null
 
   async function carregar() {
@@ -25,13 +35,32 @@ export default function Clientes() {
     carregar();
   }, []);
 
-  const filtrados = clientes.filter(
-    (c) =>
-      c.nome.toLowerCase().includes(busca.trim().toLowerCase()) ||
-      (c.telefone || '').includes(busca.trim())
-  );
+  const eSumido = (c) => c.qtd_compras > 0 && c.dias_sem_comprar >= DIAS_SUMIDO;
 
-  const sumidos = clientes.filter((c) => c.qtd_compras > 0 && c.dias_sem_comprar >= DIAS_SUMIDO).length;
+  // ---- KPIs (calculados do que a API já entrega) ----
+  const totalClientes = clientes.length;
+  const ativos = clientes.filter((c) => c.qtd_compras > 0).length;
+  const sumidos = clientes.filter(eSumido).length;
+  const gastoTotal = clientes.reduce((s, c) => s + c.total_gasto, 0);
+  const comprasTotal = clientes.reduce((s, c) => s + c.qtd_compras, 0);
+  const ticketGeral = comprasTotal ? gastoTotal / comprasTotal : 0;
+
+  // ---- filtro + ordenação ----
+  const filtrados = clientes
+    .filter(
+      (c) =>
+        c.nome.toLowerCase().includes(busca.trim().toLowerCase()) ||
+        (c.telefone || '').includes(busca.trim())
+    )
+    .filter((c) => (filtroTipo ? c.tipo === filtroTipo : true))
+    .filter((c) => (soSumidos ? eSumido(c) : true))
+    .sort((a, b) => {
+      if (ordem === 'nome') return a.nome.localeCompare(b.nome);
+      if (ordem === 'recente') {
+        return new Date(b.ultima_compra || 0) - new Date(a.ultima_compra || 0);
+      }
+      return b.total_gasto - a.total_gasto; // total (padrão)
+    });
 
   return (
     <LayoutApp
@@ -46,9 +75,22 @@ export default function Clientes() {
       }
     >
       <div className="flex flex-col gap-4 h-[calc(100vh-56px-32px)] min-h-[500px]">
-        {/* busca + alerta de sumidos */}
+        {/* ---- faixa de KPIs ---- */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 shrink-0">
+          <KpiCli Icone={Users} rotulo="Total de clientes" valor={numero(totalClientes)} />
+          <KpiCli Icone={UserCheck} rotulo="Ativos (já compraram)" valor={numero(ativos)} />
+          <KpiCli
+            Icone={AlertTriangle}
+            rotulo="Sumidos"
+            valor={numero(sumidos)}
+            alerta={sumidos > 0}
+          />
+          <KpiCli Icone={Wallet} rotulo="Ticket médio geral" valor={moeda(ticketGeral)} />
+        </div>
+
+        {/* ---- busca + filtros ---- */}
         <div className="flex items-center gap-3 flex-wrap shrink-0">
-          <div className="flex items-center gap-2 border-2 border-linha rounded-p px-3 bg-superficie focus-within:border-grafite flex-1 min-w-[240px]">
+          <div className="flex items-center gap-2 border-2 border-linha rounded-p px-3 bg-superficie focus-within:border-grafite flex-1 min-w-[220px]">
             <Search size={16} className="text-grafite-medio shrink-0" />
             <input
               value={busca}
@@ -57,12 +99,36 @@ export default function Clientes() {
               className="flex-1 py-2 bg-transparent text-[14px] outline-none"
             />
           </div>
-          {sumidos > 0 && (
-            <div className="flex items-center gap-2 text-[13px] font-semibold text-prumo bg-prumo/10 px-3 py-2 rounded-p">
-              <AlertTriangle size={15} />
-              {sumidos} cliente(s) sumido(s)
-            </div>
-          )}
+
+          {/* filtro por tipo */}
+          <Seletor
+            className="min-w-[150px]"
+            valor={filtroTipo}
+            onChange={setFiltroTipo}
+            opcoes={[{ id: '', rotulo: 'Todos os tipos' }, ...TIPOS]}
+          />
+
+          {/* ordenação */}
+          <Seletor
+            className="min-w-[190px]"
+            valor={ordem}
+            onChange={setOrdem}
+            prefixo="Ordenar:"
+            opcoes={ORDENS}
+          />
+
+          {/* toggle só sumidos */}
+          <button
+            onClick={() => setSoSumidos((v) => !v)}
+            className={`flex items-center gap-2 text-[13px] font-semibold px-3 py-2 rounded-p border-2 transition-colors ${
+              soSumidos
+                ? 'bg-prumo/10 text-prumo border-prumo/30'
+                : 'text-grafite-medio border-linha hover:border-grafite-medio'
+            }`}
+          >
+            <AlertTriangle size={15} />
+            Só sumidos
+          </button>
         </div>
 
         {/* tabela */}
@@ -154,6 +220,25 @@ export default function Clientes() {
         />
       )}
     </LayoutApp>
+  );
+}
+
+// ---------- KPI da faixa superior ----------
+function KpiCli({ Icone, rotulo, valor, alerta = false }) {
+  return (
+    <div
+      className={`rounded-md px-4 py-3 border flex items-center justify-between ${
+        alerta ? 'bg-prumo/5 border-prumo/25' : 'bg-superficie border-linha'
+      }`}
+    >
+      <div>
+        <p className="text-[10.5px] font-bold uppercase tracking-wide text-grafite-medio">{rotulo}</p>
+        <p className={`text-[22px] font-bold tabular-nums mt-1 ${alerta ? 'text-prumo' : ''}`}>
+          {valor}
+        </p>
+      </div>
+      <Icone size={20} className={alerta ? 'text-prumo/50' : 'text-grafite-medio/40'} />
+    </div>
   );
 }
 

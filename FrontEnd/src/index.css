@@ -86,3 +86,17 @@ body {
     animation: none;
   }
 }
+
+/* ---------- Cursores ---------- */
+/* Tailwind v4 não aplica cursor:pointer em botões por padrão.
+   Regra global: botões e elementos com role de botão ficam clicáveis. */
+button:not(:disabled),
+[role='button']:not([aria-disabled='true']),
+label:has(> input[type='checkbox']),
+summary {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}

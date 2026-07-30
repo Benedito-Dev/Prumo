@@ -87,7 +87,7 @@ export default function Login() {
               <span className="absolute left-1/2 -translate-x-1/2 -bottom-3 w-0 h-0 border-x-[8px] border-x-transparent border-t-[14px] border-t-superficie" />
             </div>
             <div>
-              <h1 className="font-display text-[clamp(60px,9vw,104px)] leading-[0.9] tracking-[-0.03em] m-0 drop-shadow-[0_2px_12px_rgba(0,0,0,0.4)]">
+              <h1 className="font-display text-[clamp(60px,9vw,104px)] text-white leading-[0.9] tracking-[-0.03em] m-0 drop-shadow-[0_2px_12px_rgba(0,0,0,0.4)]">
                 PRUMO
               </h1>
               <span className="inline-block mt-5 bg-trena text-white font-bold text-[13px] tracking-[0.1em] uppercase px-4 py-2">
@@ -101,7 +101,7 @@ export default function Login() {
         <div className="relative mt-12 lg:mb-16 max-w-[42ch]">
           <p className="text-[20px] leading-[1.5] text-[#E3E7EA] drop-shadow-[0_1px_8px_rgba(0,0,0,0.5)]">
             O sistema de gestão feito para quem atende{' '}
-            <span className="text-superficie font-semibold">em pé, no balcão</span>, com o
+            <span className="text-trena font-semibold text">em pé, no balcão</span>, com o
             cliente esperando.
           </p>
         </div>

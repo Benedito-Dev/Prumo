@@ -35,6 +35,10 @@ services:
       JWT_REFRESH_SECRET: dev-refresh-secret-prumo-troque-em-producao
       ACCESS_TOKEN_TTL: 15m
       REFRESH_TOKEN_TTL_DIAS: 7
+      # admin inicial (criado só se o banco não tiver nenhum usuário)
+      ADMIN_NOME: Benedito
+      ADMIN_EMAIL: beneditobittencourtt@gmail.com
+      ADMIN_SENHA: prumo123
     ports:
       - "3000:3000"
     volumes:

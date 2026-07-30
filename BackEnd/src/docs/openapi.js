@@ -68,6 +68,7 @@ const schemas = {
       },
       preco_venda: { type: 'string', example: '37.00' },
       preco_custo: { type: 'string', nullable: true, example: '30.00' },
+      imagem_url: { type: 'string', nullable: true, description: 'URL da foto do produto' },
       ativo: { type: 'boolean' },
     },
   },
@@ -83,6 +84,7 @@ const schemas = {
       preco_venda: { type: 'number', example: 37.0 },
       preco_custo: { type: 'number', example: 30.0 },
       categoria_id: { type: 'string', format: 'uuid' },
+      imagem_url: { type: 'string', description: 'URL da foto do produto (opcional)' },
     },
   },
 
@@ -131,7 +133,8 @@ const schemas = {
         type: 'string',
         enum: ['dinheiro', 'pix', 'cartao', 'fiado'],
       },
-      valor_total: { type: 'string', example: '1720.00' },
+      desconto: { type: 'string', example: '0.00', description: 'Desconto aplicado (subtraído do total)' },
+      valor_total: { type: 'string', example: '1720.00', description: 'Soma dos itens − desconto' },
       status: { type: 'string', enum: ['concluida', 'cancelada'] },
       vendida_em: { type: 'string', format: 'date-time' },
       cancelada_em: { type: 'string', format: 'date-time', nullable: true },
@@ -153,6 +156,7 @@ const schemas = {
         type: 'string',
         enum: ['dinheiro', 'pix', 'cartao', 'fiado'],
       },
+      desconto: { type: 'number', example: 0, description: 'Desconto em R$ (opcional). Não pode exceder o total dos itens.' },
       itens: {
         type: 'array',
         minItems: 1,
@@ -299,6 +303,33 @@ export const openapiSpec = {
     },
 
     // ---------------- CLIENTES ----------------
+    '/clientes/estatisticas': {
+      get: {
+        tags: ['Clientes'],
+        summary: 'Clientes com estatísticas de compra (total, nº compras, última compra)',
+        description:
+          'LEFT JOIN com vendas concluídas. dias_sem_comprar ajuda a identificar clientes sumidos (RF24).',
+        responses: {
+          200: ok({
+            type: 'array',
+            items: {
+              allOf: [
+                { $ref: '#/components/schemas/Cliente' },
+                {
+                  type: 'object',
+                  properties: {
+                    total_gasto: { type: 'number' },
+                    qtd_compras: { type: 'number' },
+                    ultima_compra: { type: 'string', format: 'date-time', nullable: true },
+                    dias_sem_comprar: { type: 'integer', nullable: true },
+                  },
+                },
+              ],
+            },
+          }),
+        },
+      },
+    },
     '/clientes': {
       get: {
         tags: ['Clientes'],
@@ -609,7 +640,7 @@ export const openapiSpec = {
     '/painel/resumo': {
       get: {
         tags: ['Painel'],
-        summary: 'Total, nº de vendas e ticket médio (RF18)',
+        summary: 'Total, nº de vendas, ticket médio e variação vs. período anterior (RF18)',
         parameters: [
           {
             name: 'periodo',
@@ -619,7 +650,27 @@ export const openapiSpec = {
           { name: 'de', in: 'query', schema: { type: 'string', format: 'date' } },
           { name: 'ate', in: 'query', schema: { type: 'string', format: 'date' } },
         ],
-        responses: { 200: ok({ type: 'object' }) },
+        responses: {
+          200: ok({
+            type: 'object',
+            properties: {
+              total: { type: 'number' },
+              qtd_vendas: { type: 'number' },
+              ticket_medio: { type: 'number' },
+              clientes: { type: 'number' },
+              variacao: {
+                type: 'object',
+                description: '% vs. período anterior (null se sem base)',
+                properties: {
+                  total: { type: 'number', nullable: true },
+                  qtd_vendas: { type: 'number', nullable: true },
+                  ticket_medio: { type: 'number', nullable: true },
+                  clientes: { type: 'number', nullable: true },
+                },
+              },
+            },
+          }),
+        },
       },
     },
     '/painel/ranking-clientes': {

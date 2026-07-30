@@ -69,9 +69,13 @@ export async function buscarVenda(req, res) {
 // preco_unitario por item é opcional: se não vier, usa o preço atual do produto;
 // se vier, respeita a negociação do balcão (RF12).
 export async function criarVenda(req, res) {
-  const { cliente_id, usuario_id, forma_pagamento, itens } = req.body;
+  const { cliente_id, usuario_id, forma_pagamento, itens, desconto } = req.body;
+  const descontoNum = Number(desconto) || 0;
 
   // --- Validações (antes de abrir a transação) ---
+  if (descontoNum < 0) {
+    return res.status(400).json({ erro: 'desconto não pode ser negativo' });
+  }
   if (!usuario_id) {
     return res.status(400).json({ erro: 'usuario_id (quem vendeu) é obrigatório' });
   }
@@ -104,10 +108,10 @@ export async function criarVenda(req, res) {
 
     // Cria o cabeçalho da venda (valor_total entra depois com a soma dos itens)
     const vendaResult = await client.query(
-      `INSERT INTO venda (cliente_id, usuario_id, forma_pagamento, valor_total)
-       VALUES ($1, $2, $3, 0)
+      `INSERT INTO venda (cliente_id, usuario_id, forma_pagamento, desconto, valor_total)
+       VALUES ($1, $2, $3, $4, 0)
        RETURNING id`,
-      [cliente_id ?? null, usuario_id, forma_pagamento]
+      [cliente_id ?? null, usuario_id, forma_pagamento, descontoNum]
     );
     const vendaId = vendaResult.rows[0].id;
 
@@ -144,8 +148,13 @@ export async function criarVenda(req, res) {
       );
     }
 
-    // Fecha o total da venda
-    valorTotal = Number(valorTotal.toFixed(2));
+    // Aplica o desconto: total = soma dos itens − desconto (nunca abaixo de 0)
+    const somaItens = Number(valorTotal.toFixed(2));
+    if (descontoNum > somaItens) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ erro: 'Desconto maior que o total dos itens' });
+    }
+    valorTotal = Number((somaItens - descontoNum).toFixed(2));
     await client.query('UPDATE venda SET valor_total = $1 WHERE id = $2', [valorTotal, vendaId]);
 
     await client.query('COMMIT');

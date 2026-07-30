@@ -24,10 +24,19 @@ export default function NovaVenda() {
   const [erro, setErro] = useState('');
   const [modalCliente, setModalCliente] = useState(false);
   const [vendaSalva, setVendaSalva] = useState(null);
+  const [tipoDesconto, setTipoDesconto] = useState('valor'); // 'valor' | 'percentual'
+  const [descontoInput, setDescontoInput] = useState('');
 
   const subtotal = itens.reduce((s, i) => s + Number(i.quantidade || 0) * Number(i.preco_unitario || 0), 0);
   const qtdTotal = itens.reduce((s, i) => s + Number(i.quantidade || 0), 0);
-  const total = subtotal; // desconto entra depois
+
+  // desconto em R$ (converte de % se for o caso), limitado ao subtotal
+  const descontoBruto =
+    tipoDesconto === 'percentual'
+      ? (subtotal * (Number(descontoInput) || 0)) / 100
+      : Number(descontoInput) || 0;
+  const desconto = Math.min(Math.max(descontoBruto, 0), subtotal);
+  const total = subtotal - desconto;
 
   function adicionarProduto(p) {
     // se já existe, incrementa; senão adiciona
@@ -80,6 +89,7 @@ export default function NovaVenda() {
         cliente_id: cliente?.id ?? null,
         usuario_id: usuario.id,
         forma_pagamento: pagamento,
+        desconto: Number(desconto.toFixed(2)),
         itens: itens.map((i) => ({
           produto_id: i.produto_id,
           quantidade: Number(i.quantidade),
@@ -99,6 +109,7 @@ export default function NovaVenda() {
     setCliente(null);
     setItens([]);
     setPagamento('dinheiro');
+    setDescontoInput('');
     setErro('');
     setVendaSalva(null);
   }
@@ -236,6 +247,52 @@ export default function NovaVenda() {
           <div className="flex flex-col gap-2 py-3 border-y border-linha">
             <LinhaResumo rotulo={`Itens (${itens.length})`} valor={`${qtdTotal} un.`} />
             <LinhaResumo rotulo="Subtotal" valor={moeda(subtotal)} />
+            {desconto > 0 && (
+              <div className="flex items-center justify-between text-[13px]">
+                <span className="text-grafite-medio">Desconto</span>
+                <span className="font-semibold tabular-nums text-prumo">− {moeda(desconto)}</span>
+              </div>
+            )}
+          </div>
+
+          {/* desconto */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[11px] font-semibold text-grafite-medio">Desconto</p>
+              {/* toggle % / R$ */}
+              <div className="flex bg-concreto rounded-p p-1 gap-1">
+                {[
+                  { id: 'valor', rotulo: 'R$' },
+                  { id: 'percentual', rotulo: '%' },
+                ].map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => setTipoDesconto(t.id)}
+                    className={`px-4 py-1.5 rounded-[5px] text-[13px] font-bold transition-colors ${
+                      tipoDesconto === t.id
+                        ? 'bg-superficie text-grafite shadow-sm'
+                        : 'text-grafite-medio hover:text-grafite'
+                    }`}
+                  >
+                    {t.rotulo}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex items-center border-2 border-linha rounded-p px-3 focus-within:border-grafite">
+              <span className="text-[13px] text-grafite-medio">
+                {tipoDesconto === 'valor' ? 'R$' : '%'}
+              </span>
+              <input
+                type="number"
+                min="0"
+                step="any"
+                value={descontoInput}
+                onChange={(e) => setDescontoInput(e.target.value)}
+                placeholder="0"
+                className="flex-1 py-2 px-2 text-right text-[14px] font-semibold tabular-nums bg-transparent outline-none"
+              />
+            </div>
           </div>
 
           {/* total destacado */}

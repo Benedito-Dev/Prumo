@@ -79,6 +79,7 @@ CREATE TABLE venda (
     usuario_id       UUID          NOT NULL REFERENCES usuario (id),
     forma_pagamento  VARCHAR(15)   NOT NULL
                      CHECK (forma_pagamento IN ('dinheiro','pix','cartao','fiado')),
+    desconto         NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (desconto >= 0),
     valor_total      NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (valor_total >= 0),
     status           VARCHAR(12)   NOT NULL DEFAULT 'concluida'
                      CHECK (status IN ('concluida','cancelada')),

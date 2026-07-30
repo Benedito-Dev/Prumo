@@ -45,6 +45,24 @@ export default function Clientes() {
   const comprasTotal = clientes.reduce((s, c) => s + c.qtd_compras, 0);
   const ticketGeral = comprasTotal ? gastoTotal / comprasTotal : 0;
 
+  // ---- Curva ABC (Pareto) e barra de proporção ----
+  // Ordena por gasto desc, acumula o %: até 80% = A (VIP), até 95% = B, resto = C.
+  const maxGasto = Math.max(...clientes.map((c) => c.total_gasto), 1);
+  const classeABC = {};
+  {
+    const ordenados = [...clientes].sort((a, b) => b.total_gasto - a.total_gasto);
+    let acumulado = 0;
+    ordenados.forEach((c) => {
+      if (c.total_gasto === 0) {
+        classeABC[c.id] = 'C';
+        return;
+      }
+      acumulado += c.total_gasto;
+      const pctAcum = (acumulado / (gastoTotal || 1)) * 100;
+      classeABC[c.id] = pctAcum <= 80 ? 'A' : pctAcum <= 95 ? 'B' : 'C';
+    });
+  }
+
   // ---- filtro + ordenação ----
   const filtrados = clientes
     .filter(
@@ -150,9 +168,10 @@ export default function Clientes() {
               <table className="w-full">
                 <thead className="sticky top-0 bg-superficie z-10">
                   <tr className="text-[10.5px] font-bold tracking-[0.08em] uppercase text-grafite-medio border-b border-linha">
-                    <th className="text-left px-5 py-3">Cliente</th>
+                    <th className="text-center px-3 py-3 w-14">Classe</th>
+                    <th className="text-left px-3 py-3">Cliente</th>
                     <th className="text-left px-3 py-3">Tipo</th>
-                    <th className="text-right px-3 py-3">Total gasto</th>
+                    <th className="text-left px-3 py-3 w-[220px]">Total gasto</th>
                     <th className="text-right px-3 py-3">Compras</th>
                     <th className="text-left px-3 py-3">Última compra</th>
                   </tr>
@@ -166,7 +185,10 @@ export default function Clientes() {
                         onClick={() => navigate(`/clientes/${c.id}`)}
                         className="text-[14px] border-b border-linha hover:bg-concreto/40 cursor-pointer"
                       >
-                        <td className="px-5 py-3">
+                        <td className="px-3 py-3 text-center">
+                          <EtiquetaABC classe={classeABC[c.id]} />
+                        </td>
+                        <td className="px-3 py-3">
                           <div className="flex items-center gap-3">
                             <span className="w-8 h-8 rounded-full bg-trena/15 text-trena font-bold text-[13px] flex items-center justify-center shrink-0">
                               {c.nome.charAt(0).toUpperCase()}
@@ -185,8 +207,14 @@ export default function Clientes() {
                           </div>
                         </td>
                         <td className="px-3 py-3 text-grafite-medio">{rotuloTipo(c.tipo)}</td>
-                        <td className="px-3 py-3 text-right font-semibold tabular-nums">
-                          {moeda(c.total_gasto)}
+                        <td className="px-3 py-3">
+                          <p className="font-semibold tabular-nums mb-1">{moeda(c.total_gasto)}</p>
+                          <div className="h-1.5 bg-concreto rounded-full overflow-hidden">
+                            <div
+                              className="h-full rounded-full bg-nivel"
+                              style={{ width: `${Math.max((c.total_gasto / maxGasto) * 100, 2)}%` }}
+                            />
+                          </div>
                         </td>
                         <td className="px-3 py-3 text-right tabular-nums">{c.qtd_compras}</td>
                         <td className="px-3 py-3 text-grafite-medio">
@@ -220,6 +248,25 @@ export default function Clientes() {
         />
       )}
     </LayoutApp>
+  );
+}
+
+// ---------- Etiqueta da curva ABC ----------
+// A = VIP (concentra o faturamento), B = médio, C = ocasional.
+const ABC = {
+  A: { cor: 'bg-nivel/15 text-nivel', titulo: 'VIP — concentra o faturamento' },
+  B: { cor: 'bg-trena/15 text-trena-escuro', titulo: 'Médio' },
+  C: { cor: 'bg-grafite-medio/15 text-grafite-medio', titulo: 'Ocasional' },
+};
+function EtiquetaABC({ classe }) {
+  const e = ABC[classe] || ABC.C;
+  return (
+    <span
+      title={e.titulo}
+      className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-[13px] font-bold ${e.cor}`}
+    >
+      {classe}
+    </span>
   );
 }
 

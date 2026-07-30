@@ -62,6 +62,7 @@ CREATE TABLE produto (
                   CHECK (unidade IN ('saco','milheiro','m3','peca','barra','kg','metro','carrada')),
     preco_venda   NUMERIC(12,2)  NOT NULL CHECK (preco_venda >= 0),
     preco_custo   NUMERIC(12,2)  CHECK (preco_custo >= 0),   -- opcional (RF08)
+    imagem_url    TEXT,                                       -- foto do produto (opcional)
     ativo         BOOLEAN        NOT NULL DEFAULT TRUE
 );
 

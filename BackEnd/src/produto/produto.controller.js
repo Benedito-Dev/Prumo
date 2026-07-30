@@ -63,7 +63,7 @@ export async function buscarProduto(req, res) {
 // POST /api/produtos
 export async function criarProduto(req, res) {
   try {
-    const { nome, unidade, preco_venda, preco_custo, categoria_id } = req.body;
+    const { nome, unidade, preco_venda, preco_custo, categoria_id, imagem_url } = req.body;
 
     const erroValidacao = validarProduto(req.body);
     if (erroValidacao) {
@@ -71,10 +71,10 @@ export async function criarProduto(req, res) {
     }
 
     const resultado = await query(
-      `INSERT INTO produto (nome, unidade, preco_venda, preco_custo, categoria_id)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO produto (nome, unidade, preco_venda, preco_custo, categoria_id, imagem_url)
+       VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING *`,
-      [nome, unidade, preco_venda, preco_custo ?? null, categoria_id ?? null]
+      [nome, unidade, preco_venda, preco_custo ?? null, categoria_id ?? null, imagem_url ?? null]
     );
     res.status(201).json(resultado.rows[0]);
   } catch (erro) {
@@ -90,7 +90,7 @@ export async function criarProduto(req, res) {
 export async function atualizarProduto(req, res) {
   try {
     const { id } = req.params;
-    const { nome, unidade, preco_venda, preco_custo, categoria_id, ativo } = req.body;
+    const { nome, unidade, preco_venda, preco_custo, categoria_id, ativo, imagem_url } = req.body;
 
     const erroValidacao = validarProduto(req.body);
     if (erroValidacao) {
@@ -100,10 +100,10 @@ export async function atualizarProduto(req, res) {
     const resultado = await query(
       `UPDATE produto
           SET nome = $1, unidade = $2, preco_venda = $3,
-              preco_custo = $4, categoria_id = $5, ativo = $6
-        WHERE id = $7
+              preco_custo = $4, categoria_id = $5, ativo = $6, imagem_url = $7
+        WHERE id = $8
       RETURNING *`,
-      [nome, unidade, preco_venda, preco_custo ?? null, categoria_id ?? null, ativo ?? true, id]
+      [nome, unidade, preco_venda, preco_custo ?? null, categoria_id ?? null, ativo ?? true, imagem_url ?? null, id]
     );
 
     if (resultado.rowCount === 0) {

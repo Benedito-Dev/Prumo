@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Receipt, Users, Package, LogOut, Sun, Moon } from 'lucide-react';
+import { LayoutDashboard, Receipt, Users, Package, NotebookPen, LogOut, Sun, Moon } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { useTheme } from '../theme/ThemeContext';
 
@@ -8,6 +8,7 @@ import { useTheme } from '../theme/ThemeContext';
 const NAV = [
   { para: '/', rotulo: 'Painel', Icone: LayoutDashboard, fim: true },
   { para: '/vendas', rotulo: 'Vendas', Icone: Receipt },
+  { para: '/fiados', rotulo: 'Fiados', Icone: NotebookPen },
   { para: '/clientes', rotulo: 'Clientes', Icone: Users },
   { para: '/produtos', rotulo: 'Produtos', Icone: Package },
 ];

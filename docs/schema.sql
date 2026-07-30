@@ -131,6 +131,21 @@ CREATE INDEX idx_refresh_usuario ON refresh_token (usuario_id);
 
 
 -- ============================================================
+--  PAGAMENTO_FIADO — quitações (parciais) de vendas fiado
+--  Saldo em aberto de uma venda = valor_total − SUM(pagamentos).
+-- ============================================================
+CREATE TABLE pagamento_fiado (
+    id           UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
+    venda_id     UUID          NOT NULL REFERENCES venda (id) ON DELETE CASCADE,
+    valor        NUMERIC(12,2) NOT NULL CHECK (valor > 0),
+    usuario_id   UUID          REFERENCES usuario (id),   -- quem recebeu
+    pago_em      TIMESTAMP     NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_pagfiado_venda ON pagamento_fiado (venda_id);
+
+
+-- ============================================================
 --  FIM DO SCHEMA v0.1
 --  Fora do escopo (fases futuras): estoque, movimento_estoque,
 --  entrada_mercadoria, conta_cliente (fiado), previsao, log_auditoria.

@@ -9,6 +9,7 @@ import produtoRoutes from './produto/produto.routes.js';
 import usuarioRoutes from './usuario/usuario.routes.js';
 import vendaRoutes from './venda/venda.routes.js';
 import painelRoutes from './painel/painel.routes.js';
+import fiadoRoutes from './fiado/fiado.routes.js';
 import { requireAuth } from './auth/requireAuth.js';
 
 const router = Router();
@@ -26,5 +27,6 @@ router.use('/produtos', produtoRoutes);
 router.use('/usuarios', usuarioRoutes);
 router.use('/vendas', vendaRoutes);
 router.use('/painel', painelRoutes);
+router.use('/fiados', fiadoRoutes);
 
 export default router;

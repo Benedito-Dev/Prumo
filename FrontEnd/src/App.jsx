@@ -6,6 +6,7 @@ import Vendas from './pages/Vendas';
 import Produtos from './pages/Produtos';
 import Clientes from './pages/Clientes';
 import ClienteDetalhe from './pages/ClienteDetalhe';
+import Fiados from './pages/Fiados';
 import RotaProtegida from './auth/RotaProtegida';
 
 export default function App() {
@@ -57,6 +58,14 @@ export default function App() {
         element={
           <RotaProtegida>
             <ClienteDetalhe />
+          </RotaProtegida>
+        }
+      />
+      <Route
+        path="/fiados"
+        element={
+          <RotaProtegida>
+            <Fiados />
           </RotaProtegida>
         }
       />

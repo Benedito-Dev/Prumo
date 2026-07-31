@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, Users, AlertTriangle, UserCheck, Wallet, UserPlus } from 'lucide-react';
+import { Plus, Search, Users, AlertTriangle, UserCheck, Wallet, X } from 'lucide-react';
 import LayoutApp from '../components/LayoutApp';
 import Seletor from '../components/Seletor';
 import { clientesService, TIPOS, rotuloTipo, DIAS_SUMIDO } from '../services/clientes';

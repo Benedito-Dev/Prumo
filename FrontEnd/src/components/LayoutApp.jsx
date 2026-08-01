@@ -1,7 +1,12 @@
+import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Receipt, Users, Package, NotebookPen, LogOut, Sun, Moon } from 'lucide-react';
+import {
+  LayoutDashboard, Receipt, Users, Package, NotebookPen,
+  LogOut, Sun, Moon, UserCog, KeyRound,
+} from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { useTheme } from '../theme/ThemeContext';
+import ModalTrocarSenha from './ModalTrocarSenha';
 
 // Layout das telas internas (web/desktop): sidebar fixa à esquerda +
 // área de conteúdo à direita. Cada item de navegação tem ícone e rótulo.
@@ -16,6 +21,8 @@ const NAV = [
 export default function LayoutApp({ titulo, periodo, acao, children }) {
   const { usuario, sair } = useAuth();
   const { escuro, alternar } = useTheme();
+  const [trocandoSenha, setTrocandoSenha] = useState(false);
+  const ehDono = usuario?.papel === 'dono';
   const navigate = useNavigate();
 
   async function aoSair() {
@@ -70,6 +77,26 @@ export default function LayoutApp({ titulo, periodo, acao, children }) {
               </div>
             </div>
           )}
+          {ehDono && (
+            <NavLink
+              to="/usuarios"
+              className={({ isActive }) =>
+                `w-full flex items-center gap-2.5 px-3 py-2 rounded-p text-[13px] font-semibold transition-colors ${
+                  isActive ? 'bg-white/10 text-white' : 'text-[#A8B0B8] hover:bg-white/5 hover:text-white'
+                }`
+              }
+            >
+              <UserCog size={16} strokeWidth={2} className="shrink-0" />
+              Usuários
+            </NavLink>
+          )}
+          <button
+            onClick={() => setTrocandoSenha(true)}
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-p text-[13px] font-semibold text-[#A8B0B8] hover:bg-white/5 hover:text-white transition-colors"
+          >
+            <KeyRound size={16} strokeWidth={2} className="shrink-0" />
+            Trocar senha
+          </button>
           <button
             onClick={aoSair}
             className="w-full flex items-center gap-2.5 px-3 py-2 rounded-p text-[13px] font-semibold text-[#A8B0B8] hover:bg-white/5 hover:text-white transition-colors"
@@ -107,6 +134,8 @@ export default function LayoutApp({ titulo, periodo, acao, children }) {
         {/* conteúdo */}
         <main className="flex-1 px-5 py-4 w-full">{children}</main>
       </div>
+
+      {trocandoSenha && <ModalTrocarSenha onFechar={() => setTrocandoSenha(false)} />}
     </div>
   );
 }

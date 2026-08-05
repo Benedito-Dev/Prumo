@@ -71,62 +71,70 @@ export default function UsuarioDetalhe() {
         </button>
       }
     >
-      <div className="max-w-[900px] flex flex-col gap-4">
-        {/* cabeçalho */}
-        <div className="bg-superficie border border-linha rounded-md p-5 flex items-center gap-4">
-          <span className="w-16 h-16 rounded-full bg-trena/15 text-trena-escuro font-bold text-[26px] flex items-center justify-center shrink-0">
-            {usuario.nome.charAt(0).toUpperCase()}
-          </span>
-          <div className="flex-1">
-            <div className="flex items-center gap-2">
-              <h2 className="text-[20px] font-bold">{usuario.nome}</h2>
-              {souEu && (
-                <span className="text-[11px] font-bold uppercase text-nivel bg-nivel/10 px-2 py-0.5 rounded">você</span>
-              )}
-              {!usuario.ativo && (
-                <span className="text-[11px] font-bold uppercase text-grafite-medio bg-concreto px-2 py-0.5 rounded">inativo</span>
-              )}
+      <div className="h-[calc(100vh-56px-32px)] min-h-[500px] grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4">
+        {/* ---- coluna principal ---- */}
+        <div className="flex flex-col gap-4 min-w-0">
+          {/* cabeçalho */}
+          <div className="bg-superficie border border-linha rounded-md p-6 flex items-center gap-5">
+            <span className="w-20 h-20 rounded-full bg-trena/15 text-trena-escuro font-bold text-[32px] flex items-center justify-center shrink-0">
+              {usuario.nome.charAt(0).toUpperCase()}
+            </span>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <h2 className="text-[24px] font-bold truncate">{usuario.nome}</h2>
+                {souEu && (
+                  <span className="text-[11px] font-bold uppercase text-nivel bg-nivel/10 px-2 py-0.5 rounded shrink-0">você</span>
+                )}
+                {!usuario.ativo && (
+                  <span className="text-[11px] font-bold uppercase text-grafite-medio bg-concreto px-2 py-0.5 rounded shrink-0">inativo</span>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-x-5 gap-y-1 mt-2 text-[13.5px] text-grafite-medio">
+                <span className="flex items-center gap-1.5"><Mail size={14} /> {usuario.email}</span>
+                <span className="flex items-center gap-1.5"><Shield size={14} /> {rotuloPapel(usuario.papel)}</span>
+                {usuario.criado_em && (
+                  <span className="flex items-center gap-1.5">
+                    <Calendar size={14} /> desde {new Date(usuario.criado_em).toLocaleDateString('pt-BR')}
+                  </span>
+                )}
+              </div>
             </div>
-            <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1.5 text-[13px] text-grafite-medio">
-              <span className="flex items-center gap-1.5"><Mail size={13} /> {usuario.email}</span>
-              <span className="flex items-center gap-1.5"><Shield size={13} /> {rotuloPapel(usuario.papel)}</span>
-              {usuario.criado_em && (
-                <span className="flex items-center gap-1.5">
-                  <Calendar size={13} /> desde {new Date(usuario.criado_em).toLocaleDateString('pt-BR')}
-                </span>
-              )}
+          </div>
+
+          {/* desempenho de vendas — ocupa o resto da altura */}
+          <div className="flex-1 flex flex-col min-h-0 bg-superficie border border-linha rounded-md p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <TrendingUp size={16} className="text-grafite-medio" />
+              <p className="text-[13px] font-semibold text-grafite">Desempenho como vendedor</p>
+              <span className="text-[11px] text-grafite-medio">(no ano)</span>
             </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Indicador Icone={Wallet} rotulo="Total vendido" valor={moeda(totalVendido)} destaque />
+              <Indicador Icone={Receipt} rotulo="Nº de vendas" valor={numero(qtdVendas)} />
+              <Indicador Icone={TrendingUp} rotulo="Ticket médio" valor={moeda(ticket)} />
+            </div>
+            {qtdVendas === 0 && (
+              <div className="flex-1 flex items-center justify-center text-[13px] text-grafite-medio">
+                Nenhuma venda registrada no ano.
+              </div>
+            )}
           </div>
         </div>
 
-        {/* desempenho de vendas */}
-        <div>
-          <div className="flex items-center gap-2 mb-2 px-1">
-            <TrendingUp size={16} className="text-grafite-medio" />
-            <p className="text-[13px] font-semibold text-grafite">Desempenho como vendedor</p>
-            <span className="text-[11px] text-grafite-medio">(no ano)</span>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <Indicador Icone={Wallet} rotulo="Total vendido" valor={moeda(totalVendido)} destaque />
-            <Indicador Icone={Receipt} rotulo="Nº de vendas" valor={numero(qtdVendas)} />
-            <Indicador Icone={TrendingUp} rotulo="Ticket médio" valor={moeda(ticket)} />
-          </div>
-        </div>
-
-        {/* ações */}
-        <div className="bg-superficie border border-linha rounded-md p-5">
-          <p className="text-[10.5px] font-bold uppercase tracking-wide text-grafite-medio mb-3">Ações</p>
-          <div className="flex flex-wrap gap-2">
+        {/* ---- lateral de ações ---- */}
+        <div className="bg-superficie border border-linha rounded-md p-6 flex flex-col">
+          <p className="text-[10.5px] font-bold uppercase tracking-wide text-grafite-medio mb-4">Ações</p>
+          <div className="flex flex-col gap-2">
             <button
               onClick={() => setResetando(true)}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-p border border-linha text-[13px] font-semibold hover:bg-concreto"
+              className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-p border border-linha text-[13px] font-semibold hover:bg-concreto"
             >
               <KeyRound size={15} /> Resetar senha
             </button>
             {!souEu && (
               <button
                 onClick={alternarAtivo}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-p border text-[13px] font-semibold ${
+                className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-p border text-[13px] font-semibold ${
                   usuario.ativo
                     ? 'border-prumo/40 text-prumo hover:bg-prumo/5'
                     : 'border-nivel/40 text-nivel hover:bg-nivel/5'

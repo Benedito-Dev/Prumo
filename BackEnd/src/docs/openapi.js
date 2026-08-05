@@ -196,6 +196,9 @@ const paramId = {
   schema: { type: 'string', format: 'uuid' },
 };
 
+// Rotas protegidas por requireDono.
+const SO_DONO = 'Restrito ao dono (requireDono) — outros papéis recebem 403.';
+
 export const openapiSpec = {
   openapi: '3.0.3',
   info: {
@@ -511,11 +514,13 @@ export const openapiSpec = {
       get: {
         tags: ['Usuários'],
         summary: 'Lista usuários (sem senha)',
-        responses: { 200: ok(listaDe('Usuario')) },
+        description: SO_DONO,
+        responses: { 200: ok(listaDe('Usuario')), 403: erro('Só o dono') },
       },
       post: {
         tags: ['Usuários'],
         summary: 'Cria um usuário (senha guardada com hash)',
+        description: SO_DONO,
         requestBody: {
           required: true,
           content: { 'application/json': { schema: ref('UsuarioEntrada') } },
@@ -523,6 +528,7 @@ export const openapiSpec = {
         responses: {
           201: ok(ref('Usuario'), 'Criado'),
           400: erro('Dados inválidos'),
+          403: erro('Só o dono'),
           409: erro('E-mail já existe'),
         },
       },
@@ -531,14 +537,20 @@ export const openapiSpec = {
       get: {
         tags: ['Usuários'],
         summary: 'Busca um usuário',
+        description: SO_DONO,
         parameters: [paramId],
-        responses: { 200: ok(ref('Usuario')), 404: erro('Não encontrado') },
+        responses: {
+          200: ok(ref('Usuario')),
+          403: erro('Só o dono'),
+          404: erro('Não encontrado'),
+        },
       },
     },
     '/usuarios/{id}/ativo': {
       patch: {
         tags: ['Usuários'],
         summary: 'Ativa/desativa um usuário (soft, preserva histórico)',
+        description: SO_DONO,
         parameters: [paramId],
         requestBody: {
           required: true,
@@ -555,6 +567,73 @@ export const openapiSpec = {
         responses: {
           200: ok(ref('Usuario')),
           400: erro('Campo ativo obrigatório'),
+          403: erro('Só o dono'),
+          404: erro('Não encontrado'),
+        },
+      },
+    },
+    '/usuarios/me/senha': {
+      patch: {
+        tags: ['Usuários'],
+        summary: 'Troca a própria senha',
+        description:
+          'Qualquer usuário logado troca a própria senha. Exige a senha atual — o dono usa /usuarios/{id}/senha para resetar a de outro.',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['senha_atual', 'senha_nova'],
+                properties: {
+                  senha_atual: { type: 'string', format: 'password' },
+                  senha_nova: {
+                    type: 'string',
+                    format: 'password',
+                    minLength: 4,
+                    description: 'Ao menos 4 caracteres',
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: ok({ type: 'object', properties: { ok: { type: 'boolean' } } }),
+          400: erro('Senha atual incorreta ou nova senha curta demais'),
+          404: erro('Não encontrado'),
+        },
+      },
+    },
+    '/usuarios/{id}/senha': {
+      patch: {
+        tags: ['Usuários'],
+        summary: 'Reseta a senha de um usuário (sem pedir a atual)',
+        description: SO_DONO,
+        parameters: [paramId],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['senha_nova'],
+                properties: {
+                  senha_nova: {
+                    type: 'string',
+                    format: 'password',
+                    minLength: 4,
+                    description: 'Ao menos 4 caracteres',
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: ok({ type: 'object', properties: { ok: { type: 'boolean' } } }),
+          400: erro('Senha curta demais'),
+          403: erro('Só o dono'),
           404: erro('Não encontrado'),
         },
       },

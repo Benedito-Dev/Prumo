@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Receipt, Users, Package, NotebookPen,
-  LogOut, Sun, Moon, UserCog, KeyRound,
+  LogOut, Sun, Moon, UserCog, KeyRound, Sparkles,
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { useTheme } from '../theme/ThemeContext';
@@ -16,6 +16,7 @@ const NAV = [
   { para: '/fiados', rotulo: 'Fiados', Icone: NotebookPen },
   { para: '/clientes', rotulo: 'Clientes', Icone: Users },
   { para: '/produtos', rotulo: 'Produtos', Icone: Package },
+  { para: '/assistente', rotulo: 'Assistente', Icone: Sparkles },
 ];
 
 export default function LayoutApp({ titulo, periodo, acao, children }) {

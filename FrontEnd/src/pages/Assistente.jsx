@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Sparkles, Send, ArrowRight, RotateCcw } from 'lucide-react';
+import { Sparkles, Send, ArrowRight, RotateCcw, Mic, Square } from 'lucide-react';
 import LayoutApp from '../components/LayoutApp';
 import { assistenteService, SUGESTOES } from '../services/assistente';
+import { useDitado } from '../utils/useDitado';
 import { useAuth } from '../auth/AuthContext';
 
 // Chat com IA sobre os dados do negócio.
@@ -16,6 +17,12 @@ export default function Assistente() {
   const fimDaLista = useRef(null);
   const campo = useRef(null);
 
+  // Ditado: cada trecho final é acrescentado ao que já está escrito,
+  // para a pessoa poder misturar voz e teclado na mesma pergunta.
+  const ditado = useDitado((trecho) => {
+    setEntrada((atual) => (atual ? `${atual.trimEnd()} ` : '') + trecho.trim());
+  });
+
   // Rola para a última mensagem sempre que a conversa cresce.
   useEffect(() => {
     fimDaLista.current?.scrollIntoView({ behavior: 'smooth' });
@@ -24,6 +31,7 @@ export default function Assistente() {
   async function enviar(texto) {
     const pergunta = (texto ?? entrada).trim();
     if (!pergunta || pensando) return;
+    ditado.parar(); // não deixa o microfone aberto depois de enviar
 
     // Histórico ANTES de acrescentar a pergunta atual (o back recebe o
     // contexto anterior; a pergunta vai no campo próprio).
@@ -102,30 +110,73 @@ export default function Assistente() {
 
         {/* ---------- campo de pergunta ---------- */}
         <div className="shrink-0 pt-3">
-          <div className="flex items-end gap-2 bg-superficie border-2 border-linha rounded-md px-3 py-2 focus-within:border-grafite transition-colors">
-            <textarea
-              ref={campo}
-              value={entrada}
-              onChange={(e) => setEntrada(e.target.value)}
-              onKeyDown={aoTeclar}
-              rows={1}
-              autoFocus
-              placeholder="Pergunte sobre suas vendas, clientes, fiados…"
-              className="flex-1 min-w-0 resize-none bg-transparent text-[14px] py-1.5 outline-none max-h-32"
-            />
+          <div
+            className={`flex items-end gap-2 bg-superficie border-2 rounded-md px-3 py-2 transition-colors ${
+              ditado.ouvindo
+                ? 'border-prumo'
+                : 'border-linha focus-within:border-grafite'
+            }`}
+          >
+            <div className="flex-1 min-w-0">
+              <textarea
+                ref={campo}
+                value={entrada}
+                onChange={(e) => setEntrada(e.target.value)}
+                onKeyDown={aoTeclar}
+                rows={1}
+                autoFocus
+                placeholder={
+                  ditado.ouvindo
+                    ? 'Ouvindo… pode falar'
+                    : 'Pergunte sobre suas vendas, clientes, fiados…'
+                }
+                className="w-full resize-none bg-transparent text-[14px] py-1.5 outline-none max-h-32"
+              />
+              {/* o que o navegador ainda está transcrevendo */}
+              {ditado.parcial && (
+                <p className="text-[13.5px] text-grafite-medio italic pb-1">
+                  {ditado.parcial}
+                </p>
+              )}
+            </div>
+
+            {ditado.suportado && (
+              <button
+                onClick={ditado.alternar}
+                disabled={pensando}
+                title={ditado.ouvindo ? 'Parar de ditar' : 'Ditar a pergunta'}
+                aria-label={ditado.ouvindo ? 'Parar de ditar' : 'Ditar a pergunta'}
+                className={`w-9 h-9 shrink-0 rounded-p flex items-center justify-center border transition-colors disabled:opacity-40 ${
+                  ditado.ouvindo
+                    ? 'bg-prumo border-prumo text-white animate-pulse'
+                    : 'border-linha text-grafite-medio hover:text-grafite hover:border-grafite'
+                }`}
+              >
+                {ditado.ouvindo ? <Square size={14} /> : <Mic size={16} />}
+              </button>
+            )}
+
             <button
               onClick={() => enviar()}
               disabled={!entrada.trim() || pensando}
               title="Enviar"
-              className="w-9 h-9 shrink-0 rounded-p bg-trena hover:bg-trena-escuro text-white flex items-center justify-center disabled:opacity-40 disabled:hover:bg-trena transition-colors"
+              aria-label="Enviar pergunta"
+              className="w-9 h-9 shrink-0 rounded-p bg-trena hover:bg-trena-escuro text-trena-texto flex items-center justify-center disabled:opacity-40 disabled:hover:bg-trena transition-colors"
             >
               <Send size={16} />
             </button>
           </div>
-          <p className="text-[11px] text-grafite-medio mt-1.5 px-1">
-            O assistente responde com base nos seus dados. Confira os números
-            na tela correspondente antes de decidir.
-          </p>
+
+          {ditado.erro ? (
+            <p className="text-[11.5px] text-prumo font-semibold mt-1.5 px-1">
+              {ditado.erro}
+            </p>
+          ) : (
+            <p className="text-[11px] text-grafite-medio mt-1.5 px-1">
+              O assistente responde com base nos seus dados. Confira os números
+              na tela correspondente antes de decidir.
+            </p>
+          )}
         </div>
       </div>
     </LayoutApp>
@@ -173,7 +224,8 @@ function Mensagem({ papel, texto, fontes = [], erro = false }) {
   if (ehUsuario) {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[80%] bg-grafite text-white rounded-md rounded-br-sm px-4 py-2.5 text-[14px] whitespace-pre-wrap">
+        {/* trena é fixa nos dois temas — grafite viraria quase-branco no escuro */}
+        <div className="max-w-[80%] bg-trena text-trena-texto rounded-md rounded-br-sm px-4 py-2.5 text-[14px] leading-relaxed whitespace-pre-wrap shadow-sm">
           {texto}
         </div>
       </div>
@@ -191,7 +243,7 @@ function Mensagem({ papel, texto, fontes = [], erro = false }) {
       </span>
       <div className="min-w-0 flex-1">
         <div
-          className={`inline-block max-w-full rounded-md rounded-tl-sm px-4 py-2.5 text-[14px] whitespace-pre-wrap border ${
+          className={`inline-block max-w-full rounded-md rounded-tl-sm px-4 py-2.5 text-[14px] leading-relaxed whitespace-pre-wrap border ${
             erro
               ? 'bg-prumo/5 border-prumo/30 text-prumo font-medium'
               : 'bg-superficie border-linha'

@@ -142,6 +142,7 @@ FASE 1 ──▶ FASE 2 ──▶ FASE 3 ──▶ FASE 4
 |---|---|
 | 📄 [`docs/Prumo-Requisitos-v0.1.md`](docs/Prumo-Requisitos-v0.1.md) | Requisitos completos — contexto, requisitos funcionais e não-funcionais, riscos e pontos em aberto |
 | 🎨 [`docs/prumo-design-system.html`](docs/prumo-design-system.html) | Design system v0.1 — cores, tipografia e componentes *(abra no navegador)* |
+| 🤖 [`docs/Prumo-Assistente-IA-Plano.md`](docs/Prumo-Assistente-IA-Plano.md) | Plano de integração do assistente de IA — arquitetura em camadas, catálogo de tools, permissões e ordem de execução |
 
 ---
 

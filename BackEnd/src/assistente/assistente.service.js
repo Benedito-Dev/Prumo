@@ -1,12 +1,14 @@
-// Serviço do assistente — monta o prompt e conversa com o modelo.
+// Serviço do assistente — monta o prompt e conduz o loop de tool calling.
 //
-// PASSO 1 (atual): sem tools. O modelo responde só com o que sabe da
-// conversa, e é instruído a dizer que ainda não consulta os dados.
-// PASSO 3 acrescenta o catálogo de tools e o loop de execução.
+// Ciclo: manda a pergunta + o catálogo permitido ao papel -> o modelo pede
+// uma tool -> executamos a query -> devolvemos o resultado -> ele responde
+// em português. Repete até ele parar de pedir tools ou bater o teto.
 
 import { chamarModelo } from './openrouter.js';
+import { schemasParaModelo, executarTool } from './tools.js';
 
-const MAX_HISTORICO = 20; // últimas mensagens que viajam no contexto
+const MAX_HISTORICO = 20;   // últimas mensagens que viajam no contexto
+const MAX_ITERACOES = 4;    // teto do loop — modelo confuso não roda solto
 
 function systemPrompt(usuario) {
   const hoje = new Date().toLocaleDateString('pt-BR', {
@@ -26,19 +28,20 @@ COMO RESPONDER
 - Respostas curtas. Isso é um chat, não um relatório.
 - Valores sempre em reais, no formato R$ 1.234,56.
 
+CONSULTANDO OS DADOS
+- Use as funções disponíveis para consultar os dados reais do depósito.
+- Responda com base APENAS no que a função devolveu.
+- Quando o usuário não disser o período, use o mês corrente.
+- Se a função devolver uma lista vazia ou zerada, diga que ainda não há
+  movimento no período — não tente preencher com suposições.
+- Se a função devolver um erro de permissão, explique que essa informação
+  é restrita ao dono, sem detalhar o motivo técnico.
+
 REGRA MAIS IMPORTANTE
 - NUNCA invente números, nomes de clientes, valores ou datas.
+- Todo número que você citar tem que ter vindo de uma função.
 - Se você não tem o dado, diga que não tem. Um número errado é muito pior
-  que um "não sei".
-
-O QUE VOCÊ AINDA NÃO CONSEGUE FAZER
-- Você ainda NÃO tem acesso aos dados do depósito (vendas, clientes,
-  fiados, produtos). Essa ligação está sendo construída.
-- Se perguntarem algo que dependa desses dados, explique com naturalidade
-  que ainda não consegue consultar essa informação, e sugira a tela do
-  sistema onde ela está disponível (Painel, Vendas, Fiados, Clientes ou
-  Produtos).
-- Você pode conversar normalmente sobre o que é o Prumo e como usá-lo.`;
+  que um "não sei".`;
 }
 
 // Converte o histórico do front ({ papel, texto }) para o formato do modelo.
@@ -54,16 +57,75 @@ function traduzirHistorico(historico = []) {
 
 // Responde uma pergunta. Devolve { resposta, fontes }.
 export async function responder({ pergunta, historico, usuario }) {
+  const papel = usuario?.papel;
+  const tools = schemasParaModelo(papel);
+
   const mensagens = [
     { role: 'system', content: systemPrompt(usuario) },
     ...traduzirHistorico(historico),
     { role: 'user', content: pergunta },
   ];
 
+  // Fontes acumuladas: cada tool usada oferece o atalho para a sua tela.
+  const fontes = new Map();
+
+  for (let volta = 0; volta < MAX_ITERACOES; volta++) {
+    const { mensagem } = await chamarModelo({ mensagens, tools });
+    const pedidos = mensagem?.tool_calls || [];
+
+    // Sem pedido de tool: é a resposta final.
+    if (pedidos.length === 0) {
+      return {
+        resposta: mensagem?.content?.trim() || 'Não consegui formular uma resposta.',
+        fontes: [...fontes.values()],
+      };
+    }
+
+    // O turno do assistente precisa entrar no histórico antes dos resultados.
+    mensagens.push(mensagem);
+
+    for (const pedido of pedidos) {
+      const nome = pedido.function?.name;
+      let args = {};
+      try {
+        args = JSON.parse(pedido.function?.arguments || '{}');
+      } catch {
+        args = {}; // argumentos malformados: segue com os padrões da tool
+      }
+
+      let resultado;
+      let fonte = null;
+      try {
+        ({ resultado, fonte } = await executarTool(nome, args, usuario));
+      } catch (erro) {
+        // Falha de banco não derruba a conversa — o modelo é avisado.
+        console.error(`[assistente] tool ${nome} falhou:`, erro.message);
+        resultado = { erro: 'Não foi possível consultar essa informação agora.' };
+      }
+
+      if (fonte) fontes.set(fonte.para, fonte);
+      console.log(`[assistente] tool ${nome}(${JSON.stringify(args)})`);
+
+      mensagens.push({
+        role: 'tool',
+        tool_call_id: pedido.id,
+        content: JSON.stringify(resultado),
+      });
+    }
+  }
+
+  // Estourou o teto: pede uma resposta final com o que já foi coletado.
+  mensagens.push({
+    role: 'user',
+    content:
+      'Responda agora, em uma frase, com base no que você já consultou. Não chame mais funções.',
+  });
   const { mensagem } = await chamarModelo({ mensagens });
 
   return {
-    resposta: mensagem?.content?.trim() || 'Não consegui formular uma resposta.',
-    fontes: [], // passo 3: cada tool usada acrescenta a sua
+    resposta:
+      mensagem?.content?.trim() ||
+      'Consultei os dados mas não consegui montar a resposta. Tente perguntar de outro jeito.',
+    fontes: [...fontes.values()],
   };
 }

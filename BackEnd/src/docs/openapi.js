@@ -219,6 +219,7 @@ export const openapiSpec = {
     { name: 'Vendas', description: 'Registro de vendas — o núcleo (RF10–RF14)' },
     { name: 'Fiados', description: 'Contas a receber — vendas fiado em aberto e pagamentos' },
     { name: 'Painel', description: 'Indicadores do painel (RF16–RF22)' },
+    { name: 'Assistente', description: 'Chat com IA sobre os dados do negócio (via OpenRouter)' },
   ],
   components: {
     schemas,
@@ -894,6 +895,75 @@ export const openapiSpec = {
         summary: 'Faturamento diário para gráfico (RF22)',
         parameters: [{ name: 'periodo', in: 'query', schema: { type: 'string' } }],
         responses: { 200: ok({ type: 'array', items: { type: 'object' } }) },
+      },
+    },
+
+    // ---------------- ASSISTENTE ----------------
+    '/assistente/perguntar': {
+      post: {
+        tags: ['Assistente'],
+        summary: 'Pergunta em linguagem natural sobre o negócio',
+        description:
+          'Envia a pergunta a um modelo de IA (via OpenRouter) que consulta os dados ' +
+          'através de um catálogo fechado de funções somente leitura — o modelo nunca ' +
+          'escreve SQL. O catálogo é filtrado pelo papel do usuário: faturamento, ' +
+          'ranking de clientes e desempenho de vendedores só para o dono; produtos, ' +
+          'fiados e clientes para qualquer usuário logado.',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['pergunta'],
+                properties: {
+                  pergunta: {
+                    type: 'string',
+                    maxLength: 1000,
+                    example: 'Quanto tenho a receber de fiado?',
+                  },
+                  historico: {
+                    type: 'array',
+                    description:
+                      'Conversa anterior, para dar contexto. As 20 mais recentes são usadas.',
+                    items: {
+                      type: 'object',
+                      properties: {
+                        papel: { type: 'string', enum: ['usuario', 'assistente'] },
+                        texto: { type: 'string' },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: ok({
+            type: 'object',
+            properties: {
+              resposta: {
+                type: 'string',
+                example: 'Você tem R$ 1.250,00 a receber, de 3 clientes.',
+              },
+              fontes: {
+                type: 'array',
+                description: 'Atalhos para as telas que têm o dado completo.',
+                items: {
+                  type: 'object',
+                  properties: {
+                    rotulo: { type: 'string', example: 'Fiados' },
+                    para: { type: 'string', example: '/fiados' },
+                  },
+                },
+              },
+            },
+          }),
+          400: erro('Pergunta vazia ou acima de 1000 caracteres'),
+          502: erro('O provedor de IA falhou ou demorou demais'),
+          503: erro('Assistente não configurado (falta OPENROUTER_API_KEY)'),
+        },
       },
     },
   },

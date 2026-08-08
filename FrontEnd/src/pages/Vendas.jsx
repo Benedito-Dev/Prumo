@@ -330,9 +330,9 @@ function ModalDetalheVenda({ id, onFechar, onCancelada }) {
   const cancelada = venda?.status === 'cancelada';
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={onFechar}>
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4 overflow-y-auto" onClick={onFechar}>
       <div
-        className="bg-superficie rounded-md w-full max-w-[480px] max-h-[90vh] overflow-y-auto"
+        className="bg-superficie rounded-md w-full max-w-[480px] my-auto max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* cabeçalho */}

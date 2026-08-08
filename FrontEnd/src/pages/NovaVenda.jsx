@@ -560,35 +560,61 @@ function BuscaProduto({ onAdicionar }) {
 }
 
 // ---------- Linha de item editável ----------
+// Até sm: duas faixas (nome em cima, controles embaixo) — os controles somam
+// ~310px fixos e não sobra largura para o nome do produto num celular.
+// A partir de sm: tudo numa linha só, como era.
 function LinhaItem({ item, onQuantidade, onPreco, onRemover }) {
   const subtotal = Number(item.quantidade || 0) * Number(item.preco_unitario || 0);
   return (
-    <div className="flex items-center gap-3 py-3">
-      <div className="flex-1 min-w-0">
-        <p className="text-[14px] font-semibold truncate">{item.nome}</p>
-        <p className="text-[11.5px] text-grafite-medio">{item.unidade}</p>
+    <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 py-3">
+      {/* nome + lixeira: no mobile a lixeira sobe para esta faixa */}
+      <div className="flex items-start gap-2 flex-1 min-w-0">
+        <div className="flex-1 min-w-0">
+          <p className="text-[14px] font-semibold break-words sm:truncate">{item.nome}</p>
+          <p className="text-[11.5px] text-grafite-medio">{item.unidade}</p>
+        </div>
+        <button
+          onClick={onRemover}
+          className="sm:hidden text-grafite-medio hover:text-prumo p-1 -m-1 shrink-0"
+          title="Remover item"
+          aria-label={`Remover ${item.nome}`}
+        >
+          <Trash2 size={18} />
+        </button>
       </div>
 
-      <SeletorQuantidade valor={item.quantidade} onChange={onQuantidade} />
-      <span className="text-grafite-medio text-[13px]">×</span>
-      <div className="flex items-center border border-linha rounded-p focus-within:border-grafite">
-        <span className="text-[12px] text-grafite-medio pl-2">R$</span>
-        <input
-          type="number"
-          value={item.preco_unitario}
-          onChange={(e) => onPreco(e.target.value)}
-          min="0"
-          step="0.01"
-          className="w-20 py-1.5 px-1.5 text-right text-[14px] font-semibold tabular-nums bg-transparent outline-none"
-          title="Preço unitário"
-        />
+      {/* controles: quantidade x preço = subtotal */}
+      <div className="flex items-center gap-2 sm:gap-3">
+        <SeletorQuantidade valor={item.quantidade} onChange={onQuantidade} />
+        <span className="text-grafite-medio text-[13px]">×</span>
+        <div className="flex items-center border border-linha rounded-p focus-within:border-grafite">
+          <span className="text-[12px] text-grafite-medio pl-2">R$</span>
+          <input
+            type="number"
+            value={item.preco_unitario}
+            onChange={(e) => onPreco(e.target.value)}
+            min="0"
+            step="0.01"
+            className="w-20 py-1.5 px-1.5 text-right text-[14px] font-semibold tabular-nums bg-transparent outline-none"
+            title="Preço unitário"
+          />
+        </div>
+
+        {/* no mobile o subtotal empurra para a direita e ganha rótulo */}
+        <span className="flex-1 sm:flex-none sm:w-24 text-right text-[14px] font-bold tabular-nums">
+          <span className="sm:hidden text-[11px] font-semibold text-grafite-medio mr-1">=</span>
+          {moeda(subtotal)}
+        </span>
+
+        <button
+          onClick={onRemover}
+          className="hidden sm:block text-grafite-medio hover:text-prumo"
+          title="Remover item"
+          aria-label={`Remover ${item.nome}`}
+        >
+          <Trash2 size={16} />
+        </button>
       </div>
-
-      <span className="w-24 text-right text-[14px] font-bold tabular-nums">{moeda(subtotal)}</span>
-
-      <button onClick={onRemover} className="text-grafite-medio hover:text-prumo" title="Remover item">
-        <Trash2 size={16} />
-      </button>
     </div>
   );
 }
@@ -684,11 +710,11 @@ function ModalNovoCliente({ onFechar, onCriado }) {
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4 overflow-y-auto"
       onClick={onFechar}
     >
       <div
-        className="bg-superficie rounded-md w-full max-w-[380px] p-5"
+        className="bg-superficie rounded-md w-full max-w-[380px] my-auto p-5 max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-4">

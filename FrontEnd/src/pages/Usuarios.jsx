@@ -334,8 +334,8 @@ function ModalResetarSenha({ usuario, onFechar, onSalvo }) {
 // ---------- Componentes compartilhados ----------
 function Overlay({ titulo, onFechar, children }) {
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={onFechar}>
-      <div className="bg-superficie rounded-md w-full max-w-[420px] p-5 overflow-x-hidden" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4 overflow-y-auto" onClick={onFechar}>
+      <div className="bg-superficie rounded-md w-full max-w-[420px] my-auto p-5 max-h-[90vh] overflow-y-auto overflow-x-hidden" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
           <p className="text-[16px] font-bold">{titulo}</p>
           <button onClick={onFechar} className="text-grafite-medio hover:text-grafite">

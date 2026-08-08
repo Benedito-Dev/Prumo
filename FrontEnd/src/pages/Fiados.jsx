@@ -1,14 +1,43 @@
 import { useState, useEffect } from 'react';
-import { NotebookPen, Wallet, Users, X, Check, ChevronDown, ChevronRight } from 'lucide-react';
+import { NotebookPen, Wallet, Users, X, Check, ChevronDown, ChevronRight, Search } from 'lucide-react';
 import LayoutApp from '../components/LayoutApp';
 import { fiadosService } from '../services/fiados';
 import { moeda, numero } from '../utils/formato';
+
+/* Avatar do cliente: sem foto, sem cadastro. A cor sai do próprio nome, então
+   o mesmo cliente aparece sempre com a mesma cor — o balconista reconhece pela
+   mancha de cor antes de ler o nome. */
+const CORES_AVATAR = [
+  { bg: '#0e7c86', texto: '#ffffff' }, // teal
+  { bg: '#1b7a46', texto: '#ffffff' }, // verde
+  { bg: '#c42e1e', texto: '#ffffff' }, // vermelho prumo
+  { bg: '#b45309', texto: '#ffffff' }, // âmbar
+  { bg: '#6d28d9', texto: '#ffffff' }, // roxo
+  { bg: '#1d4ed8', texto: '#ffffff' }, // azul
+  { bg: '#be185d', texto: '#ffffff' }, // magenta
+  { bg: '#3f6212', texto: '#ffffff' }, // oliva
+];
+
+function corDoNome(nome) {
+  let h = 0;
+  for (let i = 0; i < nome.length; i++) h = (h * 31 + nome.charCodeAt(i)) >>> 0;
+  return CORES_AVATAR[h % CORES_AVATAR.length];
+}
+
+// "Marcos Andrade" -> "MA"; "Consumidor" -> "CO". Duas letras leem melhor que uma.
+function iniciais(nome) {
+  const partes = nome.trim().split(/\s+/).filter(Boolean);
+  if (partes.length === 0) return '?';
+  if (partes.length === 1) return partes[0].slice(0, 2).toUpperCase();
+  return (partes[0][0] + partes[partes.length - 1][0]).toUpperCase();
+}
 
 export default function Fiados() {
   const [dividas, setDividas] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [pagando, setPagando] = useState(null); // dívida sendo paga
   const [expandido, setExpandido] = useState({}); // cliente_id -> bool
+  const [busca, setBusca] = useState('');
 
   async function carregar() {
     setCarregando(true);
@@ -39,10 +68,24 @@ export default function Fiados() {
     grupos[chave].total += d.saldo;
     grupos[chave].vendas.push(d);
   });
+  // Dentro de cada cliente, a dívida mais antiga vem primeiro: é ela que o
+  // botão "Receber" quita, e é assim que o pagamento acontece no balcão.
+  Object.values(grupos).forEach((g) =>
+    g.vendas.sort((a, b) => new Date(a.vendida_em) - new Date(b.vendida_em))
+  );
   const listaGrupos = Object.values(grupos).sort((a, b) => b.total - a.total);
 
   const totalReceber = dividas.reduce((s, d) => s + d.saldo, 0);
   const devedores = listaGrupos.length;
+
+  // A busca filtra só a lista — os KPIs continuam mostrando o total do negócio.
+  const termo = busca.trim().toLowerCase();
+  const gruposVisiveis = termo
+    ? listaGrupos.filter(
+        (g) =>
+          g.nome.toLowerCase().includes(termo) || (g.telefone || '').includes(busca.trim())
+      )
+    : listaGrupos;
 
   return (
     <LayoutApp titulo="Fiados">
@@ -52,6 +95,28 @@ export default function Fiados() {
           <KpiF Icone={Wallet} rotulo="Total a receber" valor={moeda(totalReceber)} destaque />
           <KpiF Icone={Users} rotulo="Clientes devendo" valor={numero(devedores)} />
         </div>
+
+        {/* busca por nome — com 30 clientes devendo, rolar a lista não funciona */}
+        {!carregando && listaGrupos.length > 0 && (
+          <div className="flex items-center gap-2 border-2 border-linha rounded-p px-3 bg-superficie focus-within:border-grafite shrink-0 max-w-[560px]">
+            <Search size={18} className="text-grafite-medio shrink-0" />
+            <input
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              placeholder="Buscar cliente…"
+              className="flex-1 py-2.5 bg-transparent text-[15px] outline-none"
+            />
+            {busca && (
+              <button
+                onClick={() => setBusca('')}
+                aria-label="Limpar busca"
+                className="text-grafite-medio hover:text-grafite shrink-0"
+              >
+                <X size={18} />
+              </button>
+            )}
+          </div>
+        )}
 
         {/* lista agrupada por cliente */}
         <div className="bg-superficie border border-linha rounded-md overflow-hidden flex-1 flex flex-col min-h-0">
@@ -67,44 +132,67 @@ export default function Fiados() {
                 Tudo em dia! As vendas fiado não pagas apareceriam aqui.
               </p>
             </div>
+          ) : gruposVisiveis.length === 0 ? (
+            <div className="flex-1 flex flex-col items-center justify-center text-center px-6">
+              <Search size={32} className="text-grafite-medio/40 mb-3" />
+              <p className="text-[15px] font-semibold">Nenhum cliente com esse nome</p>
+              <p className="text-[13px] text-grafite-medio mt-1">Tente outra busca.</p>
+            </div>
           ) : (
             <div className="flex-1 min-h-0 overflow-y-auto divide-y divide-linha">
-              {listaGrupos.map((g) => {
-                const aberto = expandido[g.cliente_id || 'consumidor'];
+              {gruposVisiveis.map((g) => {
+                const chave = g.cliente_id || 'consumidor';
+                const aberto = expandido[chave];
+                const cor = corDoNome(g.nome);
+                const umaSo = g.vendas.length === 1;
+
+                function alternar() {
+                  setExpandido((e) => ({ ...e, [chave]: !aberto }));
+                }
+
                 return (
-                  <div key={g.cliente_id || 'consumidor'}>
+                  <div key={chave}>
                     {/* cabeçalho do cliente */}
-                    <button
-                      onClick={() =>
-                        setExpandido((e) => ({
-                          ...e,
-                          [g.cliente_id || 'consumidor']: !aberto,
-                        }))
-                      }
-                      className="w-full flex items-center gap-3 px-5 py-3.5 hover:bg-concreto/40 text-left"
-                    >
-                      {aberto ? (
-                        <ChevronDown size={16} className="text-grafite-medio shrink-0" />
-                      ) : (
-                        <ChevronRight size={16} className="text-grafite-medio shrink-0" />
-                      )}
-                      <span className="w-9 h-9 rounded-full bg-trena/15 text-trena-escuro font-bold text-[14px] flex items-center justify-center shrink-0">
-                        {g.nome.charAt(0).toUpperCase()}
-                      </span>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[14px] font-semibold">{g.nome}</p>
-                        <p className="text-[12px] text-grafite-medio">
-                          {g.vendas.length} {g.vendas.length === 1 ? 'dívida' : 'dívidas'}
-                          {g.telefone ? ` · ${g.telefone}` : ''}
-                        </p>
-                      </div>
-                      <div className="text-right">
+                    <div className="flex items-center gap-3 px-4 sm:px-5 py-3">
+                      {/* área clicável: abre/fecha as dívidas */}
+                      <button
+                        onClick={alternar}
+                        aria-expanded={!!aberto}
+                        className="flex items-center gap-3 flex-1 min-w-0 text-left py-1 rounded-p hover:bg-concreto/40"
+                      >
+                        <span
+                          className="w-12 h-12 rounded-full font-bold text-[16px] flex items-center justify-center shrink-0"
+                          style={{ backgroundColor: cor.bg, color: cor.texto }}
+                        >
+                          {iniciais(g.nome)}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[16px] font-bold truncate">{g.nome}</p>
+                          <p className="text-[13px] text-grafite-medio flex items-center gap-1">
+                            {aberto ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                            {umaSo ? 'ver a dívida' : `ver as ${g.vendas.length} dívidas`}
+                            {g.telefone ? ` · ${g.telefone}` : ''}
+                          </p>
+                        </div>
+                      </button>
+
+                      <div className="text-right shrink-0">
                         <p className="text-[10px] font-bold uppercase text-grafite-medio">Deve</p>
-                        <p className="text-[17px] font-bold tabular-nums text-trena-escuro">
+                        <p className="text-[20px] font-bold tabular-nums text-trena-escuro leading-tight">
                           {moeda(g.total)}
                         </p>
                       </div>
-                    </button>
+
+                      {/* Ação principal. Sempre abre o modal, já na dívida mais
+                          antiga — no balcão o cliente quita a mais velha
+                          primeiro. Pra pagar outra, basta expandir e escolher. */}
+                      <button
+                        onClick={() => setPagando(g.vendas[0])}
+                        className="shrink-0 px-4 sm:px-5 h-12 rounded-p bg-nivel text-white text-[14px] font-bold hover:bg-nivel/90"
+                      >
+                        Receber
+                      </button>
+                    </div>
 
                     {/* dívidas do cliente (expandido) */}
                     {aberto && (
@@ -123,18 +211,29 @@ export default function Fiados() {
                                 {d.pago > 0 && ` · pago ${moeda(d.pago)}`} · {d.dias} dias
                               </p>
                             </div>
-                            <div className="text-right">
-                              <p className="text-[10px] font-bold uppercase text-grafite-medio">
-                                Saldo
-                              </p>
-                              <p className="text-[14px] font-bold tabular-nums">{moeda(d.saldo)}</p>
-                            </div>
-                            <button
-                              onClick={() => setPagando(d)}
-                              className="px-3 py-1.5 rounded-p bg-nivel text-white text-[12.5px] font-bold hover:bg-nivel/90"
-                            >
-                              Receber
-                            </button>
+                            {/* O saldo desta venda só informa algo novo quando
+                                há várias — com uma só ele repete o "Deve". */}
+                            {!umaSo && (
+                              <div className="text-right">
+                                <p className="text-[10px] font-bold uppercase text-grafite-medio">
+                                  Saldo
+                                </p>
+                                <p className="text-[14px] font-bold tabular-nums">
+                                  {moeda(d.saldo)}
+                                </p>
+                              </div>
+                            )}
+                            {/* Com uma dívida só, o botão do cabeçalho já faz
+                                isso — repetir aqui é ruído. Só aparece quando
+                                há mais de uma e é preciso escolher qual. */}
+                            {!umaSo && (
+                              <button
+                                onClick={() => setPagando(d)}
+                                className="px-4 h-10 rounded-p bg-nivel text-white text-[13.5px] font-bold hover:bg-nivel/90 shrink-0"
+                              >
+                                Receber
+                              </button>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -150,6 +249,7 @@ export default function Fiados() {
       {pagando && (
         <ModalPagar
           divida={pagando}
+          outras={(grupos[pagando.cliente_id || 'consumidor']?.vendas.length ?? 1) - 1}
           onFechar={() => setPagando(null)}
           onPago={() => {
             setPagando(null);
@@ -180,7 +280,7 @@ function KpiF({ Icone, rotulo, valor, destaque = false }) {
 }
 
 // ---------- Modal receber pagamento ----------
-function ModalPagar({ divida, onFechar, onPago }) {
+function ModalPagar({ divida, outras = 0, onFechar, onPago }) {
   const [valor, setValor] = useState(String(divida.saldo));
   const [erro, setErro] = useState('');
   const [salvando, setSalvando] = useState(false);
@@ -202,8 +302,8 @@ function ModalPagar({ divida, onFechar, onPago }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={onFechar}>
-      <div className="bg-superficie rounded-md w-full max-w-[400px] p-5" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4 overflow-y-auto" onClick={onFechar}>
+      <div className="bg-superficie rounded-md w-full max-w-[400px] my-auto p-5 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
           <p className="text-[16px] font-bold">Receber pagamento</p>
           <button onClick={onFechar} className="text-grafite-medio hover:text-grafite">
@@ -217,6 +317,17 @@ function ModalPagar({ divida, onFechar, onPago }) {
             Venda de {new Date(divida.vendida_em).toLocaleDateString('pt-BR')} · saldo{' '}
             <span className="font-bold">{moeda(divida.saldo)}</span>
           </p>
+          {/* Deixa explícito que isto quita UMA venda, não tudo que o cliente
+              deve — senão o usuário acha que zerou a conta dele. */}
+          {outras > 0 && (
+            <p className="text-[12px] text-grafite-medio mt-1.5 pt-1.5 border-t border-linha">
+              Dívida mais antiga. Este cliente tem mais{' '}
+              <span className="font-bold">
+                {outras} {outras === 1 ? 'venda' : 'vendas'}
+              </span>{' '}
+              em aberto.
+            </p>
+          )}
         </div>
 
         <label className="block mb-2">

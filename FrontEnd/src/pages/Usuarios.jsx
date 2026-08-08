@@ -59,7 +59,69 @@ export default function Usuarios() {
             </div>
           ) : (
             <div className="flex-1 min-h-0 overflow-y-auto">
-              <table className="w-full">
+              {/* Até md: cartões (a tabela de 5 colunas não cabe no balcão). */}
+              <ul className="md:hidden divide-y divide-linha">
+                {usuarios.map((u) => {
+                  const souEu = u.id === eu?.id;
+                  return (
+                    <li key={u.id} className={!u.ativo ? 'opacity-55' : ''}>
+                      <button
+                        onClick={() => navigate(`/usuarios/${u.id}`)}
+                        className="w-full text-left px-4 pt-3 pb-2 min-h-[56px] hover:bg-concreto"
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="w-9 h-9 rounded-full bg-trena/15 text-trena-escuro font-bold text-[13px] flex items-center justify-center shrink-0">
+                            {u.nome.charAt(0).toUpperCase()}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[15px] font-semibold flex items-center gap-2">
+                              <span className="truncate">{u.nome}</span>
+                              {souEu && (
+                                <span className="text-[10px] font-bold uppercase text-nivel bg-nivel/10 px-1.5 py-0.5 rounded shrink-0">
+                                  você
+                                </span>
+                              )}
+                            </p>
+                            <p className="text-[12px] text-grafite-medio truncate">{u.email}</p>
+                          </div>
+                          {u.ativo ? (
+                            <span className="text-[10px] font-bold uppercase text-nivel bg-nivel/10 px-2 py-0.5 rounded shrink-0">
+                              ativo
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-bold uppercase text-grafite-medio bg-concreto px-2 py-0.5 rounded shrink-0">
+                              inativo
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                      <div className="flex items-center gap-2 px-4 pb-2.5">
+                        <span className="text-[12px] font-semibold text-grafite bg-concreto px-2 py-0.5 rounded">
+                          {rotuloPapel(u.papel)}
+                        </span>
+                        <button
+                          onClick={() => setResetando(u)}
+                          className="ml-auto flex items-center gap-1 text-[13px] font-semibold text-grafite-medio hover:text-grafite px-3 py-2 rounded-p hover:bg-concreto"
+                        >
+                          <KeyRound size={14} /> Senha
+                        </button>
+                        {!souEu && (
+                          <button
+                            onClick={() => alternar(u)}
+                            className={`text-[13px] font-semibold px-3 py-2 rounded-p hover:bg-concreto ${
+                              u.ativo ? 'text-prumo' : 'text-nivel'
+                            }`}
+                          >
+                            {u.ativo ? 'Desativar' : 'Ativar'}
+                          </button>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+
+              <table className="w-full hidden md:table">
                 <thead className="sticky top-0 bg-superficie z-10">
                   <tr className="text-[10.5px] font-bold tracking-[0.08em] uppercase text-grafite-medio border-b border-linha">
                     <th className="text-left px-5 py-3">Usuário</th>
@@ -202,7 +264,8 @@ function ModalNovoUsuario({ onFechar, onSalvo }) {
         <input value={senha} onChange={(e) => setSenha(e.target.value)} className={inputU} />
       </CampoU>
       <CampoU rotulo="Papel">
-        <div className="grid grid-cols-4 gap-2">
+        {/* 4 colunas so a partir de sm — "Vendedor" nao cabe em ~90px. */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {PAPEIS.map((p) => (
             <button
               key={p.id}
@@ -271,8 +334,8 @@ function ModalResetarSenha({ usuario, onFechar, onSalvo }) {
 // ---------- Componentes compartilhados ----------
 function Overlay({ titulo, onFechar, children }) {
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={onFechar}>
-      <div className="bg-superficie rounded-md w-full max-w-[420px] p-5 overflow-x-hidden" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4 overflow-y-auto" onClick={onFechar}>
+      <div className="bg-superficie rounded-md w-full max-w-[420px] my-auto p-5 max-h-[90vh] overflow-y-auto overflow-x-hidden" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
           <p className="text-[16px] font-bold">{titulo}</p>
           <button onClick={onFechar} className="text-grafite-medio hover:text-grafite">

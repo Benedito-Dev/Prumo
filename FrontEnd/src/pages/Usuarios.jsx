@@ -264,7 +264,8 @@ function ModalNovoUsuario({ onFechar, onSalvo }) {
         <input value={senha} onChange={(e) => setSenha(e.target.value)} className={inputU} />
       </CampoU>
       <CampoU rotulo="Papel">
-        <div className="grid grid-cols-4 gap-2">
+        {/* 4 colunas so a partir de sm — "Vendedor" nao cabe em ~90px. */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {PAPEIS.map((p) => (
             <button
               key={p.id}

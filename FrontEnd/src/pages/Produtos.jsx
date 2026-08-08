@@ -305,7 +305,7 @@ function ModalProduto({ produto, categorias: categoriasIniciais, onFechar, onSal
           />
         </Campo>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Campo rotulo="Unidade">
             <select value={unidade} onChange={(e) => setUnidade(e.target.value)} className={inputCls}>
               {UNIDADES.map((u) => (
@@ -378,7 +378,7 @@ function ModalProduto({ produto, categorias: categoriasIniciais, onFechar, onSal
           </label>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Campo rotulo="Preço de venda">
             <CampoPreco valor={precoVenda} onChange={setPrecoVenda} />
           </Campo>

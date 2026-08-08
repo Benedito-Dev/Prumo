@@ -414,16 +414,18 @@ function LinhaBarra({ pos, nome, meta, valor, proporcao, cor }) {
 function PainelEsqueleto() {
   return (
     <div className="flex flex-col gap-4 animate-pulse">
-      <div className="grid grid-cols-4 gap-4">
+      {/* Os breakpoints abaixo espelham os do conteudo real — se divergirem,
+          a tela salta quando os dados chegam. */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {[0, 1, 2, 3].map((i) => (
           <div key={i} className="h-24 bg-superficie border border-linha rounded-md" />
         ))}
       </div>
-      <div className="grid grid-cols-[1.7fr_1fr] gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-[1.7fr_1fr] gap-4">
         <div className="h-80 bg-superficie border border-linha rounded-md" />
         <div className="h-80 bg-superficie border border-linha rounded-md" />
       </div>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="h-56 bg-superficie border border-linha rounded-md" />
         <div className="h-56 bg-superficie border border-linha rounded-md" />
       </div>

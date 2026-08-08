@@ -167,7 +167,8 @@ export default function NovaVenda() {
         </button>
       }
     >
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-4 lg:h-[calc(100vh-56px-32px)] lg:min-h-[560px] max-w-[1280px] mx-auto">
+      {/* pb-24 até lg: espaço para a barra fixa não cobrir o fim do resumo */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-4 pb-24 lg:pb-0 lg:h-[calc(100vh-56px-32px)] lg:min-h-[560px] max-w-[1280px] mx-auto">
         {/* ---- COLUNA ESQUERDA: cliente + itens ---- */}
         <div className="flex flex-col gap-4 min-h-0">
           {/* Cliente */}
@@ -380,14 +381,37 @@ export default function NovaVenda() {
             </div>
           )}
 
+          {/* Até lg o salvar mora na barra fixa do rodapé, para não ficar
+              abaixo da dobra quando a venda tem muitos itens. */}
           <button
             onClick={salvar}
             disabled={salvando || itens.length === 0}
-            className="min-h-[56px] rounded-p bg-trena hover:bg-trena-escuro text-white font-bold text-[16px] transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="hidden lg:flex min-h-[56px] rounded-p bg-trena hover:bg-trena-escuro text-white font-bold text-[16px] transition-colors disabled:opacity-40 disabled:cursor-not-allowed items-center justify-center gap-2"
           >
             <Check size={18} /> {salvando ? 'Salvando…' : 'Salvar venda'}
           </button>
         </div>
+      </div>
+
+      {/* ---- Barra fixa (até lg): total sempre à vista + salvar ----
+           No balcão o cliente pergunta "quanto deu?" no meio da venda; o
+           total não pode depender de rolar até o fim da página. */}
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-20 bg-superficie border-t border-linha px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] flex items-center gap-3 shadow-[0_-2px_12px_rgba(0,0,0,0.08)]">
+        <div className="min-w-0">
+          <p className="text-[10.5px] font-bold uppercase tracking-wide text-grafite-medio leading-none">
+            Total
+          </p>
+          <p className="text-[22px] font-bold tabular-nums text-nivel leading-tight">
+            {moeda(total)}
+          </p>
+        </div>
+        <button
+          onClick={salvar}
+          disabled={salvando || itens.length === 0}
+          className="flex-1 min-h-[52px] rounded-p bg-trena hover:bg-trena-escuro text-white font-bold text-[15px] transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+        >
+          <Check size={18} /> {salvando ? 'Salvando…' : 'Salvar venda'}
+        </button>
       </div>
 
       {modalCliente && (

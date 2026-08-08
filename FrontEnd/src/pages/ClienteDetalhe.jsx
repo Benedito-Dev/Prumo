@@ -135,7 +135,46 @@ export default function ClienteDetalhe() {
             </div>
           ) : (
             <div className="flex-1 min-h-0 overflow-y-auto">
-              <table className="w-full">
+              {/* Até md: cartões (a tabela de 5 colunas não cabe no balcão). */}
+              <ul className="md:hidden divide-y divide-linha">
+                {historico.map((v) => (
+                  <li
+                    key={v.id}
+                    className={`px-4 py-3 ${v.status === 'cancelada' ? 'opacity-55' : ''}`}
+                  >
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span className="text-[14px] font-semibold tabular-nums">
+                        {new Date(v.vendida_em).toLocaleDateString('pt-BR')}
+                      </span>
+                      <span className="text-[15px] font-bold tabular-nums shrink-0">
+                        {moeda(v.valor_total)}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 mt-1.5 text-[12px] text-grafite-medio">
+                      <span className="inline-flex items-center gap-1.5 shrink-0">
+                        <span
+                          className="w-2 h-2 rounded-full"
+                          style={{ background: CORES_FORMA[v.forma_pagamento] }}
+                        />
+                        {FORMAS[v.forma_pagamento] || v.forma_pagamento}
+                      </span>
+                      {Number(v.desconto) > 0 && (
+                        <>
+                          <span aria-hidden="true">·</span>
+                          <span className="tabular-nums">− {moeda(v.desconto)}</span>
+                        </>
+                      )}
+                      {v.status === 'cancelada' && (
+                        <span className="ml-auto text-[10px] font-bold uppercase text-prumo bg-prumo/10 px-1.5 py-0.5 rounded shrink-0">
+                          cancelada
+                        </span>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+
+              <table className="w-full hidden md:table">
                 <thead className="sticky top-0 bg-superficie">
                   <tr className="text-[10.5px] font-bold tracking-[0.08em] uppercase text-grafite-medio border-b border-linha">
                     <th className="text-left px-5 py-3">Data</th>

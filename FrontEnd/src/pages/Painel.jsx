@@ -282,22 +282,34 @@ export default function Painel() {
               <thead>
                 <tr className="text-[11px] font-bold tracking-[0.08em] uppercase text-grafite-medio">
                   <th className="text-left pb-3 font-bold">Cliente</th>
-                  <th className="text-left pb-3 font-bold">Pagamento</th>
-                  <th className="text-left pb-3 font-bold">Data</th>
+                  {/* Pagamento e Data saem no mobile — viram a segunda linha do Cliente. */}
+                  <th className="text-left pb-3 font-bold hidden sm:table-cell">Pagamento</th>
+                  <th className="text-left pb-3 font-bold hidden sm:table-cell">Data</th>
                   <th className="text-right pb-3 font-bold">Valor</th>
                 </tr>
               </thead>
               <tbody>
                 {recentes.map((v) => (
                   <tr key={v.id} className="border-t border-linha text-[14px]">
-                    <td className="py-3 font-semibold">{v.cliente_nome || 'Consumidor'}</td>
-                    <td className="py-3">
+                    <td className="py-3 font-semibold">
+                      {v.cliente_nome || 'Consumidor'}
+                      {/* No mobile, pagamento e data descem para cá. */}
+                      <span className="flex sm:hidden items-center gap-1.5 mt-1 text-[12px] font-normal text-grafite-medio">
+                        <span className="w-2 h-2 rounded-full shrink-0" style={{ background: FORMAS[v.forma_pagamento]?.cor }} />
+                        {FORMAS[v.forma_pagamento]?.rotulo || v.forma_pagamento}
+                        <span aria-hidden="true">·</span>
+                        <span className="tabular-nums">
+                          {new Date(v.vendida_em).toLocaleDateString('pt-BR')}
+                        </span>
+                      </span>
+                    </td>
+                    <td className="py-3 hidden sm:table-cell">
                       <span className="inline-flex items-center gap-2 text-grafite-medio">
                         <span className="w-2 h-2 rounded-full" style={{ background: FORMAS[v.forma_pagamento]?.cor }} />
                         {FORMAS[v.forma_pagamento]?.rotulo || v.forma_pagamento}
                       </span>
                     </td>
-                    <td className="py-3 text-grafite-medio tabular-nums">
+                    <td className="py-3 text-grafite-medio tabular-nums hidden sm:table-cell">
                       {new Date(v.vendida_em).toLocaleDateString('pt-BR')}
                     </td>
                     <td className="py-3 text-right font-bold tabular-nums">{moeda(v.valor_total)}</td>

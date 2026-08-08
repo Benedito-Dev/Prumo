@@ -165,7 +165,57 @@ export default function Clientes() {
             </div>
           ) : (
             <div className="flex-1 min-h-0 overflow-y-auto">
-              <table className="w-full">
+              {/* Até md: cartões (a tabela de 6 colunas não cabe no balcão). */}
+              <ul className="md:hidden divide-y divide-linha">
+                {filtrados.map((c) => {
+                  const sumido = eSumido(c);
+                  return (
+                    <li key={c.id}>
+                      <button
+                        onClick={() => navigate(`/clientes/${c.id}`)}
+                        className="w-full text-left px-4 py-3 min-h-[64px] hover:bg-concreto/40"
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="w-9 h-9 rounded-full bg-trena/15 text-trena font-bold text-[13px] flex items-center justify-center shrink-0">
+                            {c.nome.charAt(0).toUpperCase()}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[15px] font-semibold flex items-center gap-2">
+                              <span className="truncate">{c.nome}</span>
+                              {sumido && (
+                                <span className="text-[10px] font-bold uppercase text-prumo bg-prumo/10 px-1.5 py-0.5 rounded shrink-0">
+                                  sumido
+                                </span>
+                              )}
+                            </p>
+                            <p className="text-[12px] text-grafite-medio truncate">
+                              {c.telefone} · {rotuloTipo(c.tipo)}
+                            </p>
+                          </div>
+                          <EtiquetaABC classe={classeABC[c.id]} />
+                        </div>
+                        <div className="flex items-center justify-between gap-3 mt-2 text-[12px] text-grafite-medio">
+                          <span className="font-semibold tabular-nums text-grafite">
+                            {moeda(c.total_gasto)}
+                          </span>
+                          <span className="tabular-nums">
+                            {c.qtd_compras} compra(s)
+                            {c.ultima_compra && ` · ${c.dias_sem_comprar}d atrás`}
+                          </span>
+                        </div>
+                        <div className="h-1.5 bg-concreto rounded-full overflow-hidden mt-1.5">
+                          <div
+                            className="h-full rounded-full bg-nivel"
+                            style={{ width: `${Math.max((c.total_gasto / maxGasto) * 100, 2)}%` }}
+                          />
+                        </div>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+
+              <table className="w-full hidden md:table">
                 <thead className="sticky top-0 bg-superficie z-10">
                   <tr className="text-[10.5px] font-bold tracking-[0.08em] uppercase text-grafite-medio border-b border-linha">
                     <th className="text-center px-3 py-3 w-14">Classe</th>

@@ -9,6 +9,8 @@ export const TIPOS = [
 ];
 
 export const clientesService = {
+  // lista simples, sem agregação de vendas — para quem só precisa dos nomes
+  listar: () => api.get('/clientes'),
   // clientes com estatísticas de compra (total, nº compras, última compra)
   estatisticas: () => api.get('/clientes/estatisticas'),
   buscar: (id) => api.get(`/clientes/${id}`),

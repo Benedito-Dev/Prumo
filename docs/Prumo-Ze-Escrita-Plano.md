@@ -34,6 +34,7 @@
 - [📜 Contrato da API](#-contrato-da-api)
 - [🗂️ Mudanças arquivo por arquivo](#️-mudanças-arquivo-por-arquivo)
 - [🪜 Fatias verticais e ordem](#-fatias-verticais-e-ordem)
+  - [🔀 O que dá para fazer em paralelo](#-o-que-dá-para-fazer-em-paralelo)
 - [🐛 Bugs e dívidas pré-existentes](#-bugs-e-dívidas-pré-existentes)
 - [⚠️ Riscos concretos](#️-riscos-concretos)
 - [🚫 Fora de escopo](#-fora-de-escopo)
@@ -636,6 +637,54 @@ Cada fatia termina em algo verificável **sem `OPENROUTER_API_KEY`** — restri�
 3. **Confirmação (3) antes do resolvedor (4)** porque é a peça de *segurança*: se o HMAC estiver errado, tudo depois herda o furo. Segurança primeiro, conveniência depois.
 4. **Venda por último** porque depende de tudo: services, confirmação, resolvedor em lote. É a fatia onde mais coisa pode dar errado, e ela chega quando as três anteriores já estão provadas.
 5. **Fatia 7 é a única que exige a chave.** Todo o resto é verificável hoje.
+
+### 🔀 O que dá para fazer em paralelo
+
+> ⚠️ **Leia antes de dividir o trabalho.** As fatias acima foram desenhadas para serem **sequencialmente verificáveis**, não paralelizáveis. Paralelizar troca segurança de verificação por velocidade. **Com 26h totais, sozinho, a ordem sequencial é a recomendada** — cada fatia ensina algo que a seguinte usa (o formato do "registro" da Fatia 2 é reaproveitado em todas). O que segue vale para 2+ pessoas.
+
+**Grafo de dependências real** (por arquivo, não pela ordem narrativa):
+
+```
+        ┌──────────────────────────────┐
+        │ ① FUNDAÇÃO (4h)              │  ← bloqueante absoluta
+        │ erros.js + services + harness │
+        └───────────────┬──────────────┘
+                        │
+      ┌─────────────┬───┴─────────┬──────────────┐
+      ▼             ▼             ▼              ▼
+  ② ESCRITA    ③ CONFIRM.    ⑤ FIADOS     ④ RESOLVEDOR
+     (4h)         (5h)          (3h)          (2h)
+      │             │             │              │
+      └─────────────┴──────┬──────┴──────────────┘
+                           ▼
+                     ⑥ VENDA (6h)
+                           ▼
+                   ⑦ ACABAMENTO (2h)
+```
+
+| Fatia | Depende de | Por quê |
+|:---:|---|---|
+| ① | — | Todos importam `ErroNegocio` e os services |
+| ② | ① | Precisa de `produto.service.js` e `cliente.service.js` |
+| ③ | ① | `confirmacao.js` é HMAC puro — não conhece nenhuma tool |
+| ④ | ① | `resolver.js` só faz `SELECT` por nome |
+| ⑤ | ① | `fiado.service.js` é tabela própria; ninguém depende dela |
+| ⑥ | ①②③④ | Única que precisa de três peças prontas ao mesmo tempo |
+| ⑦ | tudo | Exige a `OPENROUTER_API_KEY` |
+
+Caminho crítico: **① → ② → ④ → ⑥ → ⑦**. Com duas frentes, 26h de trabalho cabem em ~17h de calendário.
+
+**Corte sugerido para duas pessoas** (ambas depois da ① feita em conjunto):
+
+- **Frente 1 — 12h:** ② Escrita → ④ Resolvedor → ⑥ Venda *(o caminho crítico)*
+- **Frente 2 — 8h:** ③ Confirmação → ⑤ Fiados *(entrega antes e fica livre para ajudar na ⑥)*
+
+**Duas armadilhas ao paralelizar:**
+
+1. 🔴 **`tools.escrita.js` é um arquivo só, tocado por 5 fatias** (②③④⑤⑥, ~480 linhas). Duas pessoas ali ao mesmo tempo = conflito de merge garantido. **Antes de paralelizar, quebre em `tools.produto.js`, `tools.cliente.js`, `tools.fiado.js`, `tools.venda.js`** e faça `spread` de todos no `TOOLS`. É uma mudança pequena que destrava o paralelismo.
+2. 🟡 **A garantia "segurança antes de conveniência" (item 3 acima) se perde.** Para preservá-la: a Frente 2 entrega o `confirmacao.js` e **nada mais consome confirmação** até ele estar verificado (token adulterado → 400, de outro usuário → 403, expirado → 400).
+
+Convergência: `tools.js` (o `spread`) e `assistente.service.js` (o system prompt) são tocados por quase todas as fatias. Merges frequentes e curtos, não um big-bang no fim.
 
 ---
 

@@ -8,7 +8,7 @@
 
 <br>
 
-![Status](https://img.shields.io/badge/status-planejado-C42E1E?style=for-the-badge)
+![Status](https://img.shields.io/badge/status-implementado-1B7A46?style=for-the-badge)
 ![Custo](https://img.shields.io/badge/custo-R$_0-1B7A46?style=for-the-badge)
 ![Latência](https://img.shields.io/badge/lat%C3%AAncia-0_ms-0E7C86?style=for-the-badge)
 
@@ -182,6 +182,33 @@ Backend inteiro · o Zé e suas tools · qualquer rota HTTP. **Isto é só front
 
 **Total: 3h30.**
 
+### ✅ Estado da execução
+
+Etapas **1, 2 e 3 implementadas** (commits `7ea5f7b` e `477f86c`). O ditado
+corrige nomes de produto e cliente contra o catálogo real, e o Zé recebe o
+texto já corrigido.
+
+**Etapa 4 — encerrada como ACEITA, não como calibrada.** Decisão do dono do
+produto em 09/08/2026.
+
+> ⚠️ **O que isso significa, sem eufemismo.** O corte de `0.78` foi escolhido
+> por análise e validado contra **fixtures que nós escrevemos** — não contra
+> gravações reais. Ninguém mediu como este navegador erra com a voz e o
+> microfone de quem usa. O número é razoável e conservador; ele apenas não foi
+> confirmado em campo.
+>
+> **Se o ditado trocar um nome por outro errado** (o único erro caro aqui,
+> porque o usuário não percebe), o ajuste é subir `CORTE_PADRAO` em
+> `FrontEnd/src/utils/corrigirDitado.js:13` — de `0.78` para `0.82` ou `0.85`.
+> Corte mais alto corrige menos e erra menos.
+>
+> **Se ele deixar de corrigir nomes óbvios**, o caminho é o inverso: baixar
+> para `0.74`. Mas desça com cuidado — a faixa de `0.6` a `0.78` é onde moram
+> os palpites.
+>
+> A calibragem de verdade continua valendo a pena e leva ~15 minutos: ditar 10
+> frases do dia a dia e comparar o falado com o transcrito.
+
 ### Por que esta ordem
 
 1. **O corretor primeiro, e isolado.** É lógica pura — testável sem microfone,
@@ -230,7 +257,20 @@ Antes e depois, com as mesmas 10 frases ditadas em voz alta:
 de corrigir é aceitável; corrigir para o nome errado, não — porque o texto
 errado a pessoa vê, e o trocado ela não percebe.
 
-> 📌 **Pendente do usuário:** um exemplo real do que foi falado vs. o que
-> apareceu escrito. O corte de similaridade e o formato do erro (palavra
-> quebrada? juntada? trocada?) dependem disso. Sem esse dado, a Etapa 4 vira
-> chute.
+### O que foi verificado, e o que não foi
+
+| Verificado | Como |
+|---|---|
+| A lógica de correção | 59 testes automatizados (`corrigirDitado.test.mjs`) |
+| O vocabulário chega do banco | chamada real à API: 4 produtos, 3 clientes |
+| A escolha entre alternativas | 4 cenários simulados, incluindo "1ª ruim, 2ª boa" |
+| Degradação sem catálogo | `undefined`, `null` e catálogo vazio — só números convertidos |
+
+| **NÃO verificado** | Por quê |
+|---|---|
+| **Como o navegador erra com voz real** | ninguém ditou; as fixtures são erros que nós supusemos |
+| **O corte 0.78 em campo** | ver o aviso na seção de etapas |
+
+> 📌 **Se um dia alguém quiser fechar essa lacuna:** dite 10 frases do dia a
+> dia no Zé e anote o falado vs. o transcrito. Com esse dado, o corte deixa de
+> ser escolha de projeto e passa a ser medição.

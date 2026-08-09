@@ -28,7 +28,9 @@ export default function Assistente() {
     fimDaLista.current?.scrollIntoView({ behavior: 'smooth' });
   }, [mensagens, pensando]);
 
-  async function enviar(texto) {
+  // `confirmacao` só vem do clique num botão de ação pendente — é o token
+  // assinado pelo servidor. Digitar "sim" não confirma nada.
+  async function enviar(texto, confirmacao) {
     const pergunta = (texto ?? entrada).trim();
     if (!pergunta || pensando) return;
     ditado.parar(); // não deixa o microfone aberto depois de enviar
@@ -44,10 +46,15 @@ export default function Assistente() {
     setPensando(true);
 
     try {
-      const r = await assistenteService.perguntar(pergunta, historico);
+      const r = await assistenteService.perguntar(pergunta, historico, confirmacao);
       setMensagens((ms) => [
         ...ms,
-        { papel: 'assistente', texto: r.resposta, fontes: r.fontes || [] },
+        {
+          papel: 'assistente',
+          texto: r.resposta,
+          fontes: r.fontes || [],
+          acaoPendente: r.acao_pendente || null,
+        },
       ]);
     } catch (e) {
       setMensagens((ms) => [
@@ -100,7 +107,17 @@ export default function Assistente() {
           ) : (
             <div className="flex flex-col gap-4 py-2">
               {mensagens.map((m, i) => (
-                <Mensagem key={i} {...m} />
+                <Mensagem
+                  key={i}
+                  {...m}
+                  // Só a última mensagem tem botão clicável: confirmar
+                  // algo de três turnos atrás é agir sobre um contexto
+                  // que já mudou.
+                  ehUltima={i === mensagens.length - 1}
+                  pensando={pensando}
+                  onConfirmar={(token) => enviar('Sim, pode fazer.', token)}
+                  onCancelar={() => enviar('Não, deixa pra lá.')}
+                />
               ))}
               {pensando && <Pensando />}
               <div ref={fimDaLista} />
@@ -218,7 +235,11 @@ function BoasVindas({ nome, onEscolher }) {
 }
 
 // ---------- balão de mensagem ----------
-function Mensagem({ papel, texto, fontes = [], erro = false }) {
+function Mensagem({
+  papel, texto, fontes = [], erro = false,
+  acaoPendente = null, ehUltima = false, pensando = false,
+  onConfirmar, onCancelar,
+}) {
   const ehUsuario = papel === 'usuario';
 
   if (ehUsuario) {
@@ -251,6 +272,34 @@ function Mensagem({ papel, texto, fontes = [], erro = false }) {
         >
           {texto}
         </div>
+
+        {/* Ação destrutiva proposta: o token vive aqui, invisível, e só
+            sai daqui pelo clique. Depois que a conversa segue, os botões
+            ficam desabilitados — o histórico mostra que houve a pergunta,
+            mas não deixa agir sobre um contexto vencido. */}
+        {acaoPendente && (
+          <div className="flex flex-wrap items-center gap-2 mt-2.5">
+            <button
+              onClick={() => onConfirmar?.(acaoPendente.token)}
+              disabled={!ehUltima || pensando}
+              className="px-4 min-h-[40px] rounded-p bg-prumo text-white text-[13px] font-bold hover:bg-prumo/90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              {acaoPendente.rotulo || 'Confirmar'}
+            </button>
+            <button
+              onClick={() => onCancelar?.()}
+              disabled={!ehUltima || pensando}
+              className="px-4 min-h-[40px] rounded-p border border-linha text-[13px] font-semibold text-grafite-medio hover:text-grafite hover:bg-concreto disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              Cancelar
+            </button>
+            {!ehUltima && (
+              <span className="text-[11.5px] text-grafite-medio">
+                Peça de novo se ainda quiser.
+              </span>
+            )}
+          </div>
+        )}
 
         {/* atalhos para a tela que tem o dado completo */}
         {fontes.length > 0 && (

@@ -5,7 +5,8 @@
 // em português. Repete até ele parar de pedir tools ou bater o teto.
 
 import { chamarModelo } from './openrouter.js';
-import { schemasParaModelo, executarTool } from './tools.js';
+import { schemasParaModelo, executarTool, ehEscrita } from './tools.js';
+import { assinarAcao, verificarAcao } from './confirmacao.js';
 
 const MAX_HISTORICO = 20;   // últimas mensagens que viajam no contexto
 const MAX_ITERACOES = 4;    // teto do loop — modelo confuso não roda solto
@@ -83,6 +84,17 @@ RECEBENDO PAGAMENTO DE FIADO
 - Se o cliente não tiver nenhuma dívida em aberto, diga isso. Não invente uma
   venda para receber.
 
+CONFIRMANDO O QUE APAGA
+- Desativar um produto pede confirmação. A função devolve
+  "precisa_confirmar" com um resumo — NÃO diga que já foi feito.
+- Transcreva o resumo e pergunte se pode. Quem aparece os botões é a tela;
+  você só escreve a pergunta, em uma ou duas frases.
+- Se a pessoa responder "sim" digitando, sem clicar no botão, a ação NÃO
+  foi autorizada: proponha de novo, sem se desculpar demais.
+- "Apagar", "excluir", "remover" e "tirar" um produto significam DESATIVAR.
+  Diga isso com clareza: o produto some da tela de venda e o histórico de
+  vendas continua intacto.
+
 REGRA MAIS IMPORTANTE
 - NUNCA invente números, nomes de clientes, valores ou datas.
 - Todo número que você citar tem que ter vindo de uma função.
@@ -101,19 +113,66 @@ function traduzirHistorico(historico = []) {
     }));
 }
 
-// Responde uma pergunta. Devolve { resposta, fontes }.
-export async function responder({ pergunta, historico, usuario }) {
+// Responde uma pergunta. Devolve { resposta, fontes, acao_pendente? }.
+//
+// `confirmacao` é o token que o front devolve ao clicar no botão de uma
+// ação destrutiva proposta antes. Quando vem, a ação assinada é
+// executada ANTES de qualquer chamada ao modelo — o texto que o usuário
+// digitou não autoriza nada, só entra no histórico para a conversa fazer
+// sentido.
+export async function responder({ pergunta, historico, usuario, confirmacao }) {
   const papel = usuario?.papel;
   const tools = schemasParaModelo(papel);
 
   const mensagens = [
     { role: 'system', content: systemPrompt(usuario) },
     ...traduzirHistorico(historico),
-    { role: 'user', content: pergunta },
   ];
 
   // Fontes acumuladas: cada tool usada oferece o atalho para a sua tela.
   const fontes = new Map();
+
+  // ---- Passo 2 de uma confirmação ----
+  // verificarAcao lança ErroNegocio (400/403) se o token for adulterado,
+  // expirado ou de outro usuário — o controller traduz em status.
+  if (confirmacao) {
+    const { tool: nomeTool, args: argsAssinados } = verificarAcao(confirmacao, usuario?.id);
+
+    let resultado;
+    let fonte = null;
+    try {
+      ({ resultado, fonte } = await executarTool(nomeTool, argsAssinados, usuario, {
+        confirmada: true,
+      }));
+    } catch (erro) {
+      console.error(`[assistente] confirmação de ${nomeTool} falhou:`, erro.message);
+      resultado = { ok: false, erro: 'Não consegui concluir a ação agora.' };
+    }
+    if (fonte) fontes.set(fonte.para, fonte);
+    console.log(`[assistente] confirmado ${nomeTool}(${JSON.stringify(argsAssinados)})`);
+
+    // O modelo não escolheu nada aqui — ele só redige o desfecho a
+    // partir do que a tool devolveu.
+    mensagens.push({
+      role: 'user',
+      content:
+        `${pergunta}\n\n[sistema] A ação confirmada foi executada. Resultado: ` +
+        `${JSON.stringify(resultado)}. Comunique o desfecho em uma ou duas frases, ` +
+        `usando o campo "resumo".`,
+    });
+
+    const { mensagem } = await chamarModelo({ mensagens });
+    return {
+      resposta: mensagem?.content?.trim() || resultado?.resumo || 'Feito.',
+      fontes: [...fontes.values()],
+    };
+  }
+
+  mensagens.push({ role: 'user', content: pergunta });
+
+  // Preenchido quando uma tool destrutiva pede confirmação: vira o
+  // campo `acao_pendente` da resposta.
+  let acaoPendente = null;
 
   for (let volta = 0; volta < MAX_ITERACOES; volta++) {
     const { mensagem } = await chamarModelo({ mensagens, tools });
@@ -124,6 +183,7 @@ export async function responder({ pergunta, historico, usuario }) {
       return {
         resposta: mensagem?.content?.trim() || 'Não consegui formular uma resposta.',
         fontes: [...fontes.values()],
+        ...(acaoPendente ? { acao_pendente: acaoPendente } : {}),
       };
     }
 
@@ -133,20 +193,46 @@ export async function responder({ pergunta, historico, usuario }) {
     for (const pedido of pedidos) {
       const nome = pedido.function?.name;
       let args = {};
+      let argsQuebrados = false;
       try {
         args = JSON.parse(pedido.function?.arguments || '{}');
       } catch {
-        args = {}; // argumentos malformados: segue com os padrões da tool
+        // Em tool de leitura, cair nos padrões é inofensivo. Em tool de
+        // ESCRITA, seguir com {} agiria sobre o alvo errado.
+        args = {};
+        argsQuebrados = true;
       }
 
       let resultado;
       let fonte = null;
       try {
-        ({ resultado, fonte } = await executarTool(nome, args, usuario));
+        if (argsQuebrados && ehEscrita(nome)) {
+          resultado = { ok: false, erro: 'Não entendi os dados. Repita o pedido, por favor.' };
+        } else {
+          ({ resultado, fonte } = await executarTool(nome, args, usuario));
+        }
       } catch (erro) {
         // Falha de banco não derruba a conversa — o modelo é avisado.
         console.error(`[assistente] tool ${nome} falhou:`, erro.message);
         resultado = { erro: 'Não foi possível consultar essa informação agora.' };
+      }
+
+      // Tool destrutiva pediu confirmação: assina a proposta e anexa à
+      // resposta. O token carrega os args JÁ RESOLVIDOS pelo preparar,
+      // para o passo 2 não refazer a busca e resolver diferente.
+      if (resultado?.precisa_confirmar) {
+        acaoPendente = {
+          token: assinarAcao({
+            tool: nome,
+            args: resultado.args,
+            usuarioId: usuario?.id,
+          }),
+          rotulo: resultado.rotulo || 'Confirmar',
+          tipo: 'destrutiva',
+        };
+        // O modelo não deve ver o token — ele só precisa do resumo para
+        // redigir a pergunta.
+        resultado = { precisa_confirmar: true, resumo: resultado.resumo };
       }
 
       if (fonte) fontes.set(fonte.para, fonte);

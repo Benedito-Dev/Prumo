@@ -934,6 +934,14 @@ export const openapiSpec = {
                       },
                     },
                   },
+                  confirmacao: {
+                    type: 'string',
+                    description:
+                      'Token de `acao_pendente` de uma resposta anterior, devolvido intacto ' +
+                      'ao clicar no botão de confirmar. É ele que autoriza a ação destrutiva — ' +
+                      'texto em linguagem natural nunca autoriza. Assinado com HMAC e válido ' +
+                      'por 5 minutos, só para o usuário que o pediu.',
+                  },
                 },
               },
             },
@@ -958,9 +966,22 @@ export const openapiSpec = {
                   },
                 },
               },
+              acao_pendente: {
+                type: 'object',
+                description:
+                  'Presente quando o Zé propôs uma ação destrutiva e espera confirmação. ' +
+                  'Nada foi gravado ainda. Devolva o `token` no campo `confirmacao` ' +
+                  'de uma nova requisição para executar.',
+                properties: {
+                  token: { type: 'string', example: 'eyJ0b29sIjo...abc.9f2c1e' },
+                  rotulo: { type: 'string', example: 'Desativar' },
+                  tipo: { type: 'string', enum: ['destrutiva'] },
+                },
+              },
             },
           }),
-          400: erro('Pergunta vazia ou acima de 1000 caracteres'),
+          400: erro('Pergunta inválida, ou confirmação adulterada/expirada'),
+          403: erro('A confirmação pertence a outro usuário'),
           502: erro('O provedor de IA falhou ou demorou demais'),
           503: erro('Assistente não configurado (falta OPENROUTER_API_KEY)'),
         },

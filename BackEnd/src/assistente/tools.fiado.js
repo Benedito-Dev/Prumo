@@ -67,6 +67,7 @@ function resumirCascata(nomeCliente, resultado) {
 
 export const TOOLS_FIADO = {
   registrar_pagamento_fiado: {
+    escreve: true,
     papeis: '*',
     fonte: { rotulo: 'Fiados', para: '/fiados' },
     schema: {

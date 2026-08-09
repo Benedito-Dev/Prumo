@@ -359,6 +359,14 @@ export const TOOLS = {
   ...TOOLS_FIADO,
 };
 
+// Uma tool escreve no banco? As de leitura declaram `fonte` e nada mais;
+// as de escrita (fatias 2, 3 e 5) marcam `escreve: true`. Serve para o
+// service ser mais rigoroso com elas — argumento malformado numa leitura
+// é inofensivo, numa escrita agiria sobre o alvo errado.
+export function ehEscrita(nome) {
+  return TOOLS[nome]?.escreve === true;
+}
+
 // Tools que o papel pode usar. O catálogo enviado ao modelo já vai filtrado,
 // então ele nem sabe que as outras existem.
 export function toolsDoPapel(papel) {
@@ -377,17 +385,30 @@ export function schemasParaModelo(papel) {
 
 // Executa uma tool pelo nome. Valida existência e permissão — nome
 // desconhecido é rejeitado, nunca "tenta assim mesmo".
-export async function executarTool(nome, args, usuario) {
+// `confirmada` só vem true depois de verificarAcao() ter validado o
+// token — ver assistente.service.js. O modelo NÃO consegue setar isso:
+// ele só escolhe nome e argumentos.
+export async function executarTool(nome, args, usuario, { confirmada = false } = {}) {
   const tool = TOOLS[nome];
   if (!tool) {
     return { resultado: { erro: `Função desconhecida: ${nome}` }, fonte: null };
   }
+  // Revalidado mesmo na confirmação: o papel pode ter sido rebaixado
+  // entre a proposta e o clique.
   if (!toolsDoPapel(usuario?.papel).includes(nome)) {
     return {
       resultado: { erro: 'Você não tem permissão para consultar essa informação.' },
       fonte: null,
     };
   }
+
+  // Tool destrutiva na primeira passada: prepara e para. Quem transforma
+  // isso num token assinado é o service — a tool não sabe o que é HMAC.
+  if (tool.confirma && !confirmada) {
+    const preparado = await tool.preparar(args || {}, usuario);
+    return { resultado: preparado, fonte: tool.fonte, tool: nome };
+  }
+
   const resultado = await tool.executar(args || {}, usuario);
-  return { resultado, fonte: tool.fonte };
+  return { resultado, fonte: tool.fonte, tool: nome };
 }

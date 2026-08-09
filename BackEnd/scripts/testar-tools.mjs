@@ -20,6 +20,7 @@ import { ErroNegocio } from '../src/config/erros.js';
 import * as produtos from '../src/produto/produto.service.js';
 import * as clientes from '../src/cliente/cliente.service.js';
 import { executarTool } from '../src/assistente/tools.js';
+import { assinarAcao, verificarAcao } from '../src/assistente/confirmacao.js';
 import * as fiados from '../src/fiado/fiado.service.js';
 import { query } from '../src/config/db.js';
 
@@ -104,6 +105,20 @@ async function esperaErro(fn, mensagemEsperada, titulo) {
   } catch (erro) {
     if (!(erro instanceof ErroNegocio)) {
       return ok(false, titulo, `lançou ${erro.name}, não ErroNegocio: ${erro.message}`);
+    }
+    ok(erro.message === mensagemEsperada, titulo, `mensagem foi "${erro.message}"`);
+  }
+}
+
+// Versão síncrona do esperaErro: verificarAcao não é async, e envolvê-la
+// numa promise esconderia um throw que acontece antes do await.
+function esperaErroSync(fn, mensagemEsperada, titulo) {
+  try {
+    fn();
+    ok(false, titulo, 'não lançou erro nenhum');
+  } catch (erro) {
+    if (!(erro instanceof ErroNegocio)) {
+      return ok(false, titulo, `lançou ${erro.name}: ${erro.message}`);
     }
     ok(erro.message === mensagemEsperada, titulo, `mensagem foi "${erro.message}"`);
   }
@@ -485,6 +500,77 @@ async function suite() {
     'SELECT COUNT(*)::int AS n FROM venda WHERE id = ANY($1)', [vendasDeTeste]
   )).rows[0].n;
   ok(sobrou === 0, 'vendas de teste removidas', `sobraram ${sobrou}`);
+
+  // ---------------------------------------------------------- Fatia 3
+  console.log('\n🔏 CONFIRMAÇÃO — o token');
+
+  const acaoBoa = { tool: 'desativar_produto', args: { id: 'abc-123' }, usuarioId: DONO.id };
+  const tokenBom = assinarAcao(acaoBoa);
+
+  const verificado = verificarAcao(tokenBom, DONO.id);
+  ok(verificado.tool === 'desativar_produto', 'token válido devolve a tool');
+  ok(verificado.args.id === 'abc-123', 'token válido devolve os args assinados');
+
+  // Adulterar o corpo sem ter o segredo: a assinatura para de bater.
+  const [dadosBom, assinaturaBoa] = tokenBom.split('.');
+  const corpoAdulterado = Buffer.from(
+    JSON.stringify({ ...acaoBoa, tool: 'cancelar_venda', usuario_id: DONO.id, expira_em: Date.now() + 60000 })
+  ).toString('base64url');
+  await esperaErroSync(() => verificarAcao(`${corpoAdulterado}.${assinaturaBoa}`, DONO.id),
+    'Confirmação inválida. Peça de novo ao Zé.', 'corpo trocado é rejeitado');
+  await esperaErroSync(() => verificarAcao(`${dadosBom}.assinaturafalsa`, DONO.id),
+    'Confirmação inválida. Peça de novo ao Zé.', 'assinatura falsa é rejeitada');
+  await esperaErroSync(() => verificarAcao('sem-ponto-nenhum', DONO.id),
+    'Confirmação inválida. Peça de novo ao Zé.', 'token malformado é rejeitado');
+
+  // Token de outro usuário — o cenário do vendedor pegando o do dono.
+  await esperaErroSync(() => verificarAcao(tokenBom, 'outro-usuario-qualquer'),
+    'Essa confirmação não é sua.', 'token de outro usuário é rejeitado');
+
+  // Expirado: assina com validade no passado manipulando o corpo é
+  // impossível (quebraria o HMAC), então usa-se um relógio adiantado.
+  const relogioReal = Date.now;
+  const tokenVelho = assinarAcao(acaoBoa);
+  Date.now = () => relogioReal() + 6 * 60 * 1000; // 6 min depois
+  await esperaErroSync(() => verificarAcao(tokenVelho, DONO.id),
+    'Essa confirmação expirou. Peça de novo.', 'token expirado é rejeitado');
+  Date.now = relogioReal;
+
+  console.log('\n🔏 CONFIRMAÇÃO — desativar produto');
+
+  const alvo = await produtos.criarProduto({
+    nome: `Desativavel ${marca}`, unidade: 'saco', preco_venda: 20,
+  });
+  criados.produtos.push(alvo.id);
+
+  // Passo 1: propõe e NÃO grava.
+  const proposta = await tool('desativar_produto', { busca: `Desativavel ${marca}` });
+  ok(proposta.precisa_confirmar === true, 'passo 1 pede confirmação');
+  ok(proposta.args?.id === alvo.id, 'passo 1 resolve o id e o carrega para o passo 2');
+  ok(/some da tela de venda/i.test(proposta.resumo), 'o resumo explica o efeito');
+  ok((await produtos.buscarProduto(alvo.id)).ativo === true,
+    'passo 1 NÃO desativou nada');
+
+  // Passo 2: confirmada = true executa de verdade.
+  const feito = (await executarTool('desativar_produto', { id: alvo.id }, DONO,
+    { confirmada: true })).resultado;
+  ok(feito.ok === true && feito.acao === 'desativado', 'passo 2 desativa');
+  ok((await produtos.buscarProduto(alvo.id)).ativo === false, 'o banco confirma');
+
+  // Idempotência: confirmar de novo não causa dano (o plano conta com isso).
+  const derepetido = (await executarTool('desativar_produto', { id: alvo.id }, DONO,
+    { confirmada: true })).resultado;
+  ok(derepetido.ok === true, 'confirmar duas vezes é inofensivo');
+
+  const revivido = await tool('reativar_produto', { busca: `Desativavel ${marca}` });
+  ok(revivido.ok === true && revivido.acao === 'reativado', 'reativar não pede confirmação');
+  ok((await produtos.buscarProduto(alvo.id)).ativo === true, 'produto voltou');
+
+  const jaAtivo = await tool('reativar_produto', { busca: `Desativavel ${marca}` });
+  ok(jaAtivo.ok === false, 'reativar o que já está ativo avisa');
+
+  const negado = await tool('desativar_produto', { busca: `Desativavel ${marca}` }, VENDEDOR);
+  ok(/permissão/i.test(negado.erro || ''), 'vendedor não desativa produto');
 
   // Limpeza — nada de lixo de teste no banco do usuário.
   console.log('\n🧹 LIMPEZA');

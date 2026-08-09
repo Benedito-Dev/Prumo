@@ -41,6 +41,7 @@ async function acharCliente(busca) {
 
 export const TOOLS_CLIENTE = {
   criar_cliente: {
+    escreve: true,
     papeis: '*',
     fonte: FONTE,
     schema: {
@@ -86,6 +87,7 @@ export const TOOLS_CLIENTE = {
   },
 
   editar_cliente: {
+    escreve: true,
     papeis: '*',
     fonte: FONTE,
     schema: {

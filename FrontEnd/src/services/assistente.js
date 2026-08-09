@@ -5,9 +5,18 @@ import { api } from './api';
 
 export const assistenteService = {
   // Envia a pergunta + o histórico recente (contexto da conversa).
-  // Espera { resposta: string, fontes?: [{ rotulo, para }] }
-  perguntar: (pergunta, historico = []) =>
-    api.post('/assistente/perguntar', { pergunta, historico }),
+  //
+  // `confirmacao` é o token que veio em `acao_pendente` de uma resposta
+  // anterior, devolvido intacto ao clicar no botão. É ele que autoriza a
+  // ação destrutiva — o texto digitado nunca autoriza nada.
+  //
+  // Espera { resposta, fontes?, acao_pendente?: { token, rotulo, tipo } }
+  perguntar: (pergunta, historico = [], confirmacao) =>
+    api.post('/assistente/perguntar', {
+      pergunta,
+      historico,
+      ...(confirmacao ? { confirmacao } : {}),
+    }),
 };
 
 // Sugestões iniciais — as perguntas do README que motivaram o produto.

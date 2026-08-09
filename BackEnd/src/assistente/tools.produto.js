@@ -14,6 +14,8 @@ import {
   atualizarProdutoParcial,
   buscarProdutosPorNome,
   buscarCategoriaPorNome,
+  contarVendasDoProduto,
+  definirAtivoProduto,
 } from '../produto/produto.service.js';
 import { protegido, resolverUnico, moeda, diferencas } from './tools.escrita.comum.js';
 
@@ -74,6 +76,7 @@ async function acharProduto(busca) {
 
 export const TOOLS_PRODUTO = {
   criar_produto: {
+    escreve: true,
     papeis: ['dono'],
     fonte: FONTE,
     schema: {
@@ -133,6 +136,7 @@ export const TOOLS_PRODUTO = {
   },
 
   editar_produto: {
+    escreve: true,
     papeis: ['dono'],
     fonte: FONTE,
     schema: {
@@ -199,6 +203,133 @@ export const TOOLS_PRODUTO = {
             : `Nada mudou em ${depois.nome} — os valores enviados já eram os que estavam gravados.`,
         };
       }, 'Não consegui alterar o produto agora.');
+    },
+  },
+
+  // ---------------------------------------------------- desativar (Fatia 3)
+  // A única tool destrutiva de produto — e por isso a única que CONFIRMA.
+  // Nunca faz DELETE: o schema tem `ativo` justamente porque apagar um
+  // produto já vendido quebraria o histórico daquelas vendas (princípio
+  // P6). "Apagar", aqui, é sumir da tela de venda.
+  desativar_produto: {
+    escreve: true,
+    papeis: ['dono'],
+    fonte: FONTE,
+    confirma: true,
+    schema: {
+      name: 'desativar_produto',
+      description:
+        'Desativa um produto: ele some da tela de venda, mas o histórico é preservado. ' +
+        'Use quando pedirem para apagar, remover, excluir ou tirar um produto. ' +
+        'Pede confirmação antes de aplicar.',
+      parameters: {
+        type: 'object',
+        properties: {
+          busca: {
+            type: 'string',
+            description: 'Nome (ou parte) do produto a desativar.',
+          },
+        },
+        required: ['busca'],
+      },
+    },
+
+    // PASSO 1: resolve e descreve, sem gravar nada.
+    async preparar(args) {
+      return protegido(async () => {
+        const candidatos = await buscarProdutosPorNome(args.busca);
+        const { item, falha } = resolverUnico(
+          candidatos, args.busca, 'produto',
+          (p) => `${p.nome} — ${moeda(p.preco_venda)}`
+        );
+        if (falha) return falha;
+
+        if (!item.ativo) {
+          return {
+            ok: false,
+            erro: `${item.nome} já está desativado.`,
+          };
+        }
+
+        const vendas = await contarVendasDoProduto(item.id);
+        const historico = vendas
+          ? ` Tem ${vendas} ${vendas === 1 ? 'venda' : 'vendas'} no histórico — ${
+              vendas === 1 ? 'ela continua intacta' : 'elas continuam intactas'
+            }.`
+          : ' Nunca foi vendido.';
+
+        return {
+          ok: true,
+          precisa_confirmar: true,
+          // args da execução: o id já resolvido, para o passo 2 não
+          // refazer a busca e correr o risco de resolver diferente.
+          args: { id: item.id },
+          rotulo: 'Desativar',
+          resumo: `Desativar "${item.nome}" (${item.unidade}, ${moeda(item.preco_venda)}).${historico} O produto some da tela de venda.`,
+        };
+      }, 'Não consegui preparar a desativação agora.');
+    },
+
+    // PASSO 2: só roda com token válido — ver confirmacao.js.
+    async executar(args) {
+      return protegido(async () => {
+        const produto = await definirAtivoProduto(args.id, false);
+        return {
+          ok: true,
+          acao: 'desativado',
+          entidade: 'produto',
+          registro: produto,
+          resumo: `${produto.nome} foi desativado. Não aparece mais na hora de vender; o histórico continua igual.`,
+        };
+      }, 'Não consegui desativar o produto agora.');
+    },
+  },
+
+  // ---------------------------------------------------- reativar (Fatia 3)
+  // NÃO confirma: reativar não destrói nada, e existir sem volta é que
+  // seria armadilha — quem conversa com o Zé é justamente quem não quer
+  // abrir a tela de Produtos para desfazer.
+  reativar_produto: {
+    escreve: true,
+    papeis: ['dono'],
+    fonte: FONTE,
+    schema: {
+      name: 'reativar_produto',
+      description:
+        'Reativa um produto desativado, fazendo-o voltar à tela de venda.',
+      parameters: {
+        type: 'object',
+        properties: {
+          busca: {
+            type: 'string',
+            description: 'Nome (ou parte) do produto a reativar.',
+          },
+        },
+        required: ['busca'],
+      },
+    },
+    async executar(args) {
+      return protegido(async () => {
+        const candidatos = await buscarProdutosPorNome(args.busca);
+        const { item, falha } = resolverUnico(
+          candidatos, args.busca, 'produto',
+          (p) => `${p.nome} — ${moeda(p.preco_venda)}`
+        );
+        if (falha) return falha;
+
+        if (item.ativo) {
+          return { ok: false, erro: `${item.nome} já está ativo.` };
+        }
+
+        const produto = await definirAtivoProduto(item.id, true);
+        return {
+          ok: true,
+          acao: 'reativado',
+          entidade: 'produto',
+          registro: produto,
+          resumo: `${produto.nome} voltou para a tela de venda.`,
+        };
+      }, 'Não consegui reativar o produto agora.');
     },
   },
 };

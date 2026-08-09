@@ -163,6 +163,17 @@ export async function buscarCategoriaPorNome(nome) {
   return rows[0] ?? null;
 }
 
+// Quantas vendas já levaram este produto. Alimenta o aviso da
+// confirmação: "tem 34 vendas no histórico — elas continuam intactas".
+// Sem esse número, desativar parece perder dado, e a pessoa hesita.
+export async function contarVendasDoProduto(id) {
+  const { rows } = await query(
+    'SELECT COUNT(*)::int AS n FROM item_venda WHERE produto_id = $1',
+    [id]
+  );
+  return rows[0].n;
+}
+
 // Desativa sem apagar — preserva o histórico de vendas (princípio P6).
 export async function definirAtivoProduto(id, ativo) {
   const { rows, rowCount } = await query(

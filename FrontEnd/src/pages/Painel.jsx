@@ -68,35 +68,47 @@ export default function Painel() {
     .toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
     .toUpperCase();
 
+  // Trilho de períodos. Na topbar ele só cabe a partir de md — abaixo disso
+  // desce para o corpo (ver AbaixoDaTopbar), senão estoura a largura junto
+  // com o hambúrguer, o título e o botão de tema.
+  const trilhoPeriodos = (
+    <div className="flex items-center gap-0.5 bg-concreto rounded-p p-0.5">
+      {PERIODOS.map((p) => (
+        <button
+          key={p.id}
+          onClick={() => setPeriodo(p.id)}
+          className={`flex-1 px-3 py-1 rounded-[4px] text-[12px] font-bold transition-colors ${
+            periodo === p.id
+              ? 'bg-superficie text-grafite shadow-sm'
+              : 'text-grafite-medio hover:text-grafite'
+          }`}
+        >
+          {p.rotulo}
+        </button>
+      ))}
+    </div>
+  );
+
   const acaoTopbar = (
     <div className="flex items-center gap-2">
-      <div className="flex items-center gap-0.5 bg-concreto rounded-p p-0.5">
-        {PERIODOS.map((p) => (
-          <button
-            key={p.id}
-            onClick={() => setPeriodo(p.id)}
-            className={`px-3 py-1 rounded-[4px] text-[12px] font-bold transition-colors ${
-              periodo === p.id
-                ? 'bg-superficie text-grafite shadow-sm'
-                : 'text-grafite-medio hover:text-grafite'
-            }`}
-          >
-            {p.rotulo}
-          </button>
-        ))}
-      </div>
+      <div className="hidden md:block">{trilhoPeriodos}</div>
       <button
         onClick={() => navigate('/vendas/nova')}
-        className="h-8 px-4 rounded-p bg-trena hover:bg-trena-escuro text-white font-bold text-[13px] transition-colors"
+        className="h-8 px-3 sm:px-4 rounded-p bg-trena hover:bg-trena-escuro text-white font-bold text-[13px] transition-colors whitespace-nowrap"
       >
-        + Nova venda
+        <span className="sm:hidden">+ Venda</span>
+        <span className="hidden sm:inline">+ Nova venda</span>
       </button>
     </div>
   );
 
+  // O trilho no corpo, só até md.
+  const periodosNoCorpo = <div className="md:hidden mb-4">{trilhoPeriodos}</div>;
+
   if (carregando || erro) {
     return (
       <LayoutApp titulo="Painel" periodo={periodoLabel} acao={acaoTopbar}>
+        {periodosNoCorpo}
         {erro ? (
           <div className="text-prumo font-semibold text-center py-10">{erro}</div>
         ) : (
@@ -149,6 +161,7 @@ export default function Painel() {
 
   return (
     <LayoutApp titulo="Painel" periodo={periodoLabel} acao={acaoTopbar}>
+      {periodosNoCorpo}
       {semVendas ? (
         <EstadoVazio
           titulo="Nenhuma venda no período"
@@ -393,20 +406,30 @@ function Kpi({ Icone, rotulo, valor, sub, chip, sentido, destaque = false }) {
 // Linha de ranking com barra de proporção sob o nome.
 function LinhaBarra({ pos, nome, meta, valor, proporcao, cor }) {
   return (
-    <div className="flex items-center gap-4 py-3 border-b border-linha last:border-b-0">
+    // Até sm, meta e valor descem para baixo do nome — as duas colunas de
+    // largura fixa (w-20 + w-24) não deixam nada para o nome num celular.
+    <div className="flex items-center gap-3 sm:gap-4 py-3 border-b border-linha last:border-b-0">
       <span className="w-5 font-ui font-semibold text-[13px] text-grafite-medio tabular-nums text-center shrink-0">
         {pos}
       </span>
       <div className="flex-1 min-w-0">
-        <p className="text-[14px] font-semibold truncate mb-1.5">{nome}</p>
+        <div className="flex items-baseline justify-between gap-2 mb-1.5">
+          <p className="text-[14px] font-semibold truncate">{nome}</p>
+          <span className="sm:hidden text-[14px] font-bold tabular-nums whitespace-nowrap shrink-0">
+            {valor}
+          </span>
+        </div>
         <div className="h-1 bg-concreto rounded-full overflow-hidden">
           <div className="h-full rounded-full" style={{ width: `${Math.max(proporcao * 100, 3)}%`, background: cor }} />
         </div>
+        <p className="sm:hidden text-[12px] text-grafite-medio tabular-nums mt-1.5">{meta}</p>
       </div>
-      <span className="text-[12px] text-grafite-medio tabular-nums whitespace-nowrap w-20 text-right">
+      <span className="hidden sm:block text-[12px] text-grafite-medio tabular-nums whitespace-nowrap w-20 text-right">
         {meta}
       </span>
-      <span className="text-[14px] font-bold tabular-nums whitespace-nowrap w-24 text-right">{valor}</span>
+      <span className="hidden sm:block text-[14px] font-bold tabular-nums whitespace-nowrap w-24 text-right">
+        {valor}
+      </span>
     </div>
   );
 }

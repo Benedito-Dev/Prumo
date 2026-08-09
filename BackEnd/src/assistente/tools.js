@@ -20,6 +20,7 @@ import { resolverPeriodo, mesCorrenteEAnterior } from '../painel/periodo.js';
 import { TOOLS_FIADO } from './tools.fiado.js';
 import { TOOLS_PRODUTO } from './tools.produto.js';
 import { TOOLS_CLIENTE } from './tools.cliente.js';
+import { TOOLS_VENDA } from './tools.venda.js';
 
 const PERIODOS = ['hoje', 'semana', 'mes', 'ano'];
 
@@ -357,6 +358,7 @@ export const TOOLS = {
   ...TOOLS_PRODUTO,
   ...TOOLS_CLIENTE,
   ...TOOLS_FIADO,
+  ...TOOLS_VENDA,
 };
 
 // Uma tool escreve no banco? As de leitura declaram `fonte` e nada mais;

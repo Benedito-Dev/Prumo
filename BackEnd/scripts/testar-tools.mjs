@@ -22,6 +22,7 @@ import * as clientes from '../src/cliente/cliente.service.js';
 import { executarTool } from '../src/assistente/tools.js';
 import { assinarAcao, verificarAcao } from '../src/assistente/confirmacao.js';
 import * as fiados from '../src/fiado/fiado.service.js';
+import * as vendaSvc from '../src/venda/venda.service.js';
 import { query } from '../src/config/db.js';
 
 // Papéis usados nos testes de tool. O papel decide o que passa no filtro
@@ -78,6 +79,13 @@ const FUNCOES = {
   pagar_fiado_cascata: (a) => fiados.registrarPagamentoEmCascata(a),
   tool_registrar_pagamento_fiado: (a) =>
     tool('registrar_pagamento_fiado', a, papelDaCli()),
+
+  // Vendas (Fatia 6).
+  listar_vendas: (a) => vendaSvc.listarVendas(a ?? {}),
+  buscar_venda: (a) => vendaSvc.buscarVenda(a.id),
+  simular_venda: (a) => vendaSvc.simularVenda(a),
+  tool_criar_venda: (a) => tool('criar_venda', a, papelDaCli()),
+  tool_cancelar_venda: (a) => tool('cancelar_venda', a, papelDaCli()),
 };
 
 const papelDaCli = () => (process.env.PAPEL === 'vendedor' ? VENDEDOR : DONO);
@@ -666,6 +674,137 @@ async function suite() {
   });
   ok(Array.isArray(fiadoAmbiguo.precisa_escolher),
     'fiado usa o mesmo resolvedor e devolve precisa_escolher');
+
+  // ---------------------------------------------------------- Fatia 6
+  console.log('\n🧾 VENDA — nota, confirmação e gravação');
+
+  const vendasCriadas = [];
+  const pv1 = await produtos.criarProduto({
+    nome: `Telha Onda ${marca}`, unidade: 'peca', preco_venda: 12,
+  });
+  const pv2 = await produtos.criarProduto({
+    nome: `Prego Ponta ${marca}`, unidade: 'kg', preco_venda: 8,
+  });
+  criados.produtos.push(pv1.id, pv2.id);
+  const compradorV = await clientes.criarCliente({
+    nome: `Comprador ${marca}`, telefone: '11944440000',
+  });
+  criados.clientes.push(compradorV.id);
+
+  const vendasAntes = Number((await query('SELECT COUNT(*)::int n FROM venda')).rows[0].n);
+
+  // Passo 1: monta a nota. NADA gravado.
+  const notaV = await tool('criar_venda', {
+    cliente: `Comprador ${marca}`,
+    forma_pagamento: 'dinheiro',
+    itens: [
+      { produto: `Telha Onda ${marca}`, quantidade: 10 },
+      { produto: `Prego Ponta ${marca}`, quantidade: 2 },
+    ],
+  });
+  ok(notaV.precisa_confirmar === true, 'venda pede confirmação');
+  ok(/Telha Onda/.test(notaV.resumo) && /Prego Ponta/.test(notaV.resumo),
+    'a nota lista os dois itens');
+  ok(/120,00/.test(notaV.resumo), 'a nota calcula 10 × 12 = 120');
+  ok(/TOTAL R\$ 136,00/.test(notaV.resumo), 'a nota soma o total (120 + 16)',
+    notaV.resumo);
+  ok(notaV.args.itens.every((i) => i.produto_id && !i.produto),
+    'só IDs resolvidos viajam para o passo 2');
+  ok(Number((await query('SELECT COUNT(*)::int n FROM venda')).rows[0].n) === vendasAntes,
+    'passo 1 NÃO gravou venda nenhuma');
+
+  // Passo 2: grava.
+  const gravada = (await executarTool('criar_venda', notaV.args, DONO,
+    { confirmada: true })).resultado;
+  ok(gravada.ok === true && gravada.acao === 'venda_lancada', 'passo 2 grava');
+  vendasCriadas.push(gravada.registro.id);
+  ok(Number(gravada.registro.valor_total) === 136, 'valor_total confere');
+  ok(gravada.registro.itens.length === 2, 'gravou os dois itens');
+  ok(gravada.registro.usuario_id === DONO.id, 'quem vendeu vem do usuário, não do pedido');
+
+  // Desconto entra na nota e no total.
+  const comDesconto = await tool('criar_venda', {
+    cliente_id: compradorV.id, forma_pagamento: 'pix', desconto: 6,
+    itens: [{ produto_id: pv1.id, quantidade: 5 }],
+  });
+  ok(/Desconto/.test(comDesconto.resumo), 'a nota mostra o desconto');
+  ok(/TOTAL R\$ 54,00/.test(comDesconto.resumo), 'desconto abatido no total (60 − 6)',
+    comDesconto.resumo);
+
+  // Ambiguidade em UM item devolve tudo de uma vez, sem gravar.
+  const pvAmbA = await produtos.criarProduto({
+    nome: `Cola Branca ${marca}`, unidade: 'kg', preco_venda: 9,
+  });
+  const pvAmbB = await produtos.criarProduto({
+    nome: `Cola Preta ${marca}`, unidade: 'kg', preco_venda: 11,
+  });
+  criados.produtos.push(pvAmbA.id, pvAmbB.id);
+
+  const ambigua = await tool('criar_venda', {
+    forma_pagamento: 'dinheiro',
+    itens: [
+      { produto: `Telha Onda ${marca}`, quantidade: 1 },
+      { produto: `Cola`, quantidade: 1 },
+    ],
+  });
+  ok(ambigua.ok === false, 'venda com item ambíguo não grava');
+  ok(ambigua.precisa_escolher && Object.keys(ambigua.precisa_escolher).some((k) => /item 2/.test(k)),
+    'aponta QUAL item está ambíguo');
+  ok(Number((await query('SELECT COUNT(*)::int n FROM venda')).rows[0].n) === vendasAntes + 1,
+    'nada gravado no caso ambíguo');
+
+  // Validações continuam valendo pela camada de service.
+  const semPagamento = await tool('criar_venda', {
+    itens: [{ produto_id: pv1.id, quantidade: 1 }], forma_pagamento: 'cheque',
+  });
+  ok(semPagamento.ok === false && /forma_pagamento/.test(semPagamento.erro),
+    'forma de pagamento inválida é recusada');
+
+  const semItem = await tool('criar_venda', { itens: [], forma_pagamento: 'dinheiro' });
+  ok(semItem.ok === false, 'venda sem item é recusada');
+
+  // Venda fiado entra no módulo de fiados.
+  const notaFiado = await tool('criar_venda', {
+    cliente_id: compradorV.id, forma_pagamento: 'fiado',
+    itens: [{ produto_id: pv2.id, quantidade: 5 }],
+  });
+  const fiadoGravado = (await executarTool('criar_venda', notaFiado.args, DONO,
+    { confirmada: true })).resultado;
+  vendasCriadas.push(fiadoGravado.registro.id);
+  ok(/fiado/i.test(fiadoGravado.resumo), 'o desfecho avisa que entrou no fiado');
+  const dividas = await fiados.fiadosDoCliente(compradorV.id);
+  ok(dividas.some((d) => d.id === fiadoGravado.registro.id),
+    'a venda fiado aparece nas dívidas do cliente');
+
+  console.log('\n🧾 VENDA — cancelamento');
+
+  const paraCancelar = gravada.registro.id;
+  const propostaCancel = await tool('cancelar_venda', { venda_id: paraCancelar });
+  ok(propostaCancel.precisa_confirmar === true, 'cancelar pede confirmação');
+  ok(/sai do faturamento/i.test(propostaCancel.resumo), 'explica o efeito');
+  ok((await vendaSvc.buscarVenda(paraCancelar)).status === 'concluida',
+    'passo 1 NÃO cancelou');
+
+  const cancelou = (await executarTool('cancelar_venda', propostaCancel.args, DONO,
+    { confirmada: true })).resultado;
+  ok(cancelou.ok === true, 'passo 2 cancela');
+  ok((await vendaSvc.buscarVenda(paraCancelar)).status === 'cancelada', 'o banco confirma');
+
+  const deNovo = await tool('cancelar_venda', { venda_id: paraCancelar });
+  ok(deNovo.ok === false && /já está cancelada/.test(deNovo.erro),
+    'cancelar duas vezes avisa');
+
+  const cancelVendedor = await tool('cancelar_venda', { venda_id: paraCancelar }, VENDEDOR);
+  ok(/permissão/i.test(cancelVendedor.erro || ''), 'vendedor não cancela venda');
+
+  // Limpeza das vendas de teste, antes da limpeza geral (FK).
+  for (const id of vendasCriadas) {
+    await query('DELETE FROM item_venda WHERE venda_id = $1', [id]);
+    await query('DELETE FROM venda WHERE id = $1', [id]);
+  }
+  const sobrouVenda = Number((await query('SELECT COUNT(*)::int n FROM venda')).rows[0].n);
+  ok(sobrouVenda === vendasAntes, 'vendas de teste removidas',
+    `esperado ${vendasAntes}, achei ${sobrouVenda}`);
 
   // Limpeza — nada de lixo de teste no banco do usuário.
   console.log('\n🧹 LIMPEZA');

@@ -88,8 +88,13 @@ function montarNota({ nota, cliente, forma_pagamento }) {
     (i) =>
       `${i.quantidade} ${i.unidade} ${i.produto_nome} — ${reais(i.preco_unitario)} = ${reais(i.subtotal)}`
   );
+  // Sem cliente, o aviso é explícito: "Consumidor" sozinho parece um
+  // nome e passa batido. É o campo que a pessoa mais deixa de conferir,
+  // e o único que não dá para corrigir depois de gravado.
   const partes = [
-    `Cliente: ${cliente ? cliente.nome : 'Consumidor'}`,
+    cliente
+      ? `Cliente: ${cliente.nome}`
+      : 'Cliente: CONSUMIDOR (venda de balcão, não entra no histórico de nenhum cliente)',
     `Pagamento: ${forma_pagamento}`,
   ];
   if (nota.desconto > 0) {
@@ -109,7 +114,9 @@ export const TOOLS_VENDA = {
       description:
         'Lança uma venda no sistema. Use para "vende 10 sacos de cimento pro João no fiado" ' +
         'ou "lança 2 vergalhões à vista". Mostra a nota e PEDE CONFIRMAÇÃO antes de gravar — ' +
-        'não diga que vendeu antes de a pessoa confirmar. Sem cliente, a venda é para Consumidor.',
+        'não diga que vendeu antes de a pessoa confirmar. ' +
+        'Se o usuário não disse para QUEM é a venda, pergunte antes de chamar esta função: ' +
+        'sem cliente ela vira "Consumidor" e não entra no histórico de ninguém.',
       parameters: {
         type: 'object',
         properties: {

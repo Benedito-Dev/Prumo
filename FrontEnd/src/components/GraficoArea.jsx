@@ -26,15 +26,25 @@ export default function GraficoArea({ dados = [], cor = '#0E7C86' }) {
   const py = (v) => H - (v / max) * (H - 10) - 4;
   const pts = dados.map((d, i) => [px(i), py(d.valor)]);
 
-  const linha = pts
-    .map((p, i) => {
-      if (i === 0) return `M ${p[0]},${p[1]}`;
-      const prev = pts[i - 1];
-      const cx = (prev[0] + p[0]) / 2;
-      return `C ${cx},${prev[1]} ${cx},${p[1]} ${p[0]},${p[1]}`;
-    })
-    .join(' ');
-  const area = `${linha} L ${pts[n - 1][0]},${H} L ${pts[0][0]},${H} Z`;
+  // Com um ponto só (ex: primeira venda do mês) não há segmento a traçar:
+  // o path seria um 'M' solto e a área um triângulo de largura zero — os
+  // dois invisíveis. Nesse caso desenha uma faixa horizontal da largura
+  // toda, que é a leitura correta: o valor é constante no período.
+  const linha =
+    n === 1
+      ? `M ${padL},${pts[0][1]} L ${W},${pts[0][1]}`
+      : pts
+          .map((p, i) => {
+            if (i === 0) return `M ${p[0]},${p[1]}`;
+            const prev = pts[i - 1];
+            const cx = (prev[0] + p[0]) / 2;
+            return `C ${cx},${prev[1]} ${cx},${p[1]} ${p[0]},${p[1]}`;
+          })
+          .join(' ');
+  const area =
+    n === 1
+      ? `${linha} L ${W},${H} L ${padL},${H} Z`
+      : `${linha} L ${pts[n - 1][0]},${H} L ${pts[0][0]},${H} Z`;
 
   const niveis = [1, 0.75, 0.5, 0.25, 0];
   const passoX = Math.ceil(n / 8);

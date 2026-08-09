@@ -4,6 +4,7 @@ import { Sparkles, Send, ArrowRight, RotateCcw, Mic, Square } from 'lucide-react
 import LayoutApp from '../components/LayoutApp';
 import { assistenteService, SUGESTOES } from '../services/assistente';
 import { useDitado } from '../utils/useDitado';
+import { useVocabulario } from '../utils/useVocabulario';
 import { useAuth } from '../auth/AuthContext';
 
 // Chat com IA sobre os dados do negócio.
@@ -17,11 +18,16 @@ export default function Assistente() {
   const fimDaLista = useRef(null);
   const campo = useRef(null);
 
+  // Nomes de produto e cliente do depósito. O ditado usa para corrigir o
+  // que o navegador ouviu errado — ele não conhece "Vergalhao 10mm".
+  // Se falhar, volta vazio e o ditado apenas não corrige nomes.
+  const { vocabulario } = useVocabulario();
+
   // Ditado: cada trecho final é acrescentado ao que já está escrito,
   // para a pessoa poder misturar voz e teclado na mesma pergunta.
   const ditado = useDitado((trecho) => {
     setEntrada((atual) => (atual ? `${atual.trimEnd()} ` : '') + trecho.trim());
-  });
+  }, vocabulario);
 
   // Rola para a última mensagem sempre que a conversa cresce.
   useEffect(() => {

@@ -132,6 +132,37 @@ export async function atualizarProdutoParcial(id, alteracoes = {}) {
   return atualizarProduto(id, merged);
 }
 
+// Busca por nome parcial — como a pessoa fala ("cimento"), não como o
+// cadastro está escrito. Quem chama decide o que fazer com 0 ou N
+// resultados; aqui não há chute.
+// O teto de 10 existe para o modelo não receber o catálogo inteiro
+// quando o termo for genérico demais.
+export async function buscarProdutosPorNome(termo, { apenasAtivos = false } = {}) {
+  const busca = String(termo ?? '').trim();
+  if (!busca) return [];
+
+  const where = apenasAtivos ? 'AND p.ativo = TRUE' : '';
+  const { rows } = await query(
+    `${SELECT_PRODUTO} WHERE p.nome ILIKE $1 ${where} ORDER BY p.nome LIMIT 10`,
+    [`%${busca}%`]
+  );
+  return rows;
+}
+
+// Categoria por nome exato (o schema garante UNIQUE). O Zé recebe
+// "cimento" do usuário, não um UUID — mas ele também NÃO cria categoria:
+// não achou, quem chama avisa em vez de inventar cadastro novo.
+export async function buscarCategoriaPorNome(nome) {
+  const busca = String(nome ?? '').trim();
+  if (!busca) return null;
+
+  const { rows } = await query(
+    'SELECT * FROM categoria WHERE nome ILIKE $1 ORDER BY nome LIMIT 1',
+    [busca]
+  );
+  return rows[0] ?? null;
+}
+
 // Desativa sem apagar — preserva o histórico de vendas (princípio P6).
 export async function definirAtivoProduto(id, ativo) {
   const { rows, rowCount } = await query(

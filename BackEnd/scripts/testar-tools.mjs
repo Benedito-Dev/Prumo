@@ -19,6 +19,30 @@ import { pool } from '../src/config/db.js';
 import { ErroNegocio } from '../src/config/erros.js';
 import * as produtos from '../src/produto/produto.service.js';
 import * as clientes from '../src/cliente/cliente.service.js';
+import { executarTool } from '../src/assistente/tools.js';
+import * as fiados from '../src/fiado/fiado.service.js';
+import { query } from '../src/config/db.js';
+
+// Papéis usados nos testes de tool. O papel decide o que passa no filtro
+// de permissão; o id precisa ser de um usuário REAL porque toda tool que
+// grava autoria (pagamento_fiado.usuario_id, venda.usuario_id) tem FK —
+// um id fictício estoura com 22P02.
+const DONO = { id: null, nome: 'Teste', papel: 'dono' };
+const VENDEDOR = { id: null, nome: 'Teste', papel: 'vendedor' };
+
+// Preenche o id dos papéis com um usuário existente. Chamado uma vez, no
+// início da suíte, antes de qualquer tool rodar.
+async function carregarUsuarioReal() {
+  const { rows } = await query('SELECT id FROM usuario ORDER BY criado_em LIMIT 1');
+  if (!rows[0]) throw new Error('Nenhum usuário no banco — a suíte precisa de um para a FK de autoria.');
+  DONO.id = rows[0].id;
+  VENDEDOR.id = rows[0].id;
+  return rows[0].id;
+}
+
+// Chama uma tool como o modelo chamaria e devolve só o resultado.
+const tool = async (nome, args, usuario = DONO) =>
+  (await executarTool(nome, args, usuario)).resultado;
 
 // Funções expostas à linha de comando.
 const FUNCOES = {
@@ -37,7 +61,25 @@ const FUNCOES = {
   atualizar_cliente: (a) => clientes.atualizarCliente(a.id, a),
   atualizar_cliente_parcial: (a) => clientes.atualizarClienteParcial(a.id, a),
   remover_cliente: (a) => clientes.removerCliente(a.id),
+
+  // Tools do Zé (Fatia 2) — chamadas como o modelo chamaria, já passando
+  // pelo filtro de papel. Use PAPEL=vendedor para testar a barreira.
+  tool_criar_produto: (a) => tool('criar_produto', a, papelDaCli()),
+  tool_editar_produto: (a) => tool('editar_produto', a, papelDaCli()),
+  tool_criar_cliente: (a) => tool('criar_cliente', a, papelDaCli()),
+  tool_editar_cliente: (a) => tool('editar_cliente', a, papelDaCli()),
+
+  // Fiados (Fatia 5).
+  listar_fiados: () => fiados.listarAbertos(),
+  resumo_fiados: () => fiados.resumoAbertos(),
+  fiados_do_cliente: (a) => fiados.fiadosDoCliente(a.cliente_id),
+  pagar_fiado: (a) => fiados.registrarPagamento(a),
+  pagar_fiado_cascata: (a) => fiados.registrarPagamentoEmCascata(a),
+  tool_registrar_pagamento_fiado: (a) =>
+    tool('registrar_pagamento_fiado', a, papelDaCli()),
 };
+
+const papelDaCli = () => (process.env.PAPEL === 'vendedor' ? VENDEDOR : DONO);
 
 // ---------- Suíte ----------
 
@@ -70,6 +112,7 @@ async function esperaErro(fn, mensagemEsperada, titulo) {
 async function suite() {
   const marca = Date.now();
   const criados = { produtos: [], clientes: [] };
+  await carregarUsuarioReal();
 
   console.log('\n🧱 PRODUTO — validação');
   await esperaErro(() => produtos.criarProduto({ unidade: 'saco', preco_venda: 1 }),
@@ -153,12 +196,307 @@ async function suite() {
   const busca = await clientes.listarClientes({ busca: String(marca) });
   ok(busca.length === 1 && busca[0].id === c.id, 'busca por nome parcial');
 
+  // ============================================================
+  //  FATIA 2 — tools de escrita do Zé
+  //  Aqui não se testa service: testa-se o que o MODELO recebe de
+  //  volta. O formato do retorno é o produto desta fatia.
+  // ============================================================
+
+  console.log('\n🤖 TOOL criar_produto');
+  const tp = await tool('criar_produto', {
+    nome: `Cimento Tool ${marca}`, unidade: 'saco', preco_venda: 42,
+  });
+  if (tp.ok) criados.produtos.push(tp.registro.id);
+  ok(tp.ok === true, 'cria com os campos mínimos', tp.erro);
+  ok(tp.acao === 'criado' && tp.entidade === 'produto', 'declara ação e entidade');
+  ok(Number(tp.registro?.preco_venda) === 42, 'registro vem do banco, não dos argumentos');
+  // O ponto da Decisão 2: o campo VAZIO precisa aparecer, senão o erro passa.
+  ok(/sem categoria/.test(tp.resumo || ''), 'resumo diz "sem categoria"', tp.resumo);
+  ok(/sem preço de custo/.test(tp.resumo || ''), 'resumo diz "sem preço de custo"', tp.resumo);
+  ok(/R\$/.test(tp.resumo || ''), 'resumo traz o preço em reais', tp.resumo);
+
+  const tpCompleto = await tool('criar_produto', {
+    nome: `Vergalhao Tool ${marca}`, unidade: 'barra', preco_venda: 38.5, preco_custo: 30,
+  });
+  if (tpCompleto.ok) criados.produtos.push(tpCompleto.registro.id);
+  ok(/custo R\$/.test(tpCompleto.resumo || ''), 'com custo, o resumo mostra o custo',
+    tpCompleto.resumo);
+
+  console.log('\n🤖 TOOL criar_produto — recusas');
+  const tpUnidade = await tool('criar_produto', {
+    nome: 'X', unidade: 'caixa', preco_venda: 1,
+  });
+  ok(tpUnidade.ok === false && /Unidade inválida/.test(tpUnidade.erro),
+    'unidade inválida devolve erro (não lança)', JSON.stringify(tpUnidade));
+  const tpNegativo = await tool('criar_produto', {
+    nome: 'X', unidade: 'saco', preco_venda: -1,
+  });
+  ok(tpNegativo.ok === false && /negativo/.test(tpNegativo.erro),
+    'preço negativo devolve erro (não lança)', JSON.stringify(tpNegativo));
+  const tpCategoria = await tool('criar_produto', {
+    nome: 'X', unidade: 'saco', preco_venda: 1, categoria: `Inexistente ${marca}`,
+  });
+  ok(tpCategoria.ok === false && /categoria/i.test(tpCategoria.erro),
+    'categoria inexistente não vira cadastro novo', JSON.stringify(tpCategoria));
+
+  console.log('\n🤖 TOOL editar_produto');
+  // O TESTE QUE MAIS IMPORTA: mexer no preço não pode apagar o resto.
+  const tpEdit = await tool('editar_produto', {
+    busca: `Vergalhao Tool ${marca}`, preco_venda: 45,
+  });
+  ok(tpEdit.ok === true, 'edita achando pelo nome', tpEdit.erro);
+  ok(Number(tpEdit.registro?.preco_venda) === 45, 'preço mudou');
+  ok(Number(tpEdit.registro?.preco_custo) === 30, 'PRESERVA o custo',
+    `virou ${tpEdit.registro?.preco_custo}`);
+  ok(tpEdit.registro?.nome === `Vergalhao Tool ${marca}`, 'PRESERVA o nome');
+  ok(tpEdit.registro?.unidade === 'barra', 'PRESERVA a unidade');
+  ok(tpEdit.registro?.imagem_url === null, 'não inventa imagem');
+
+  ok(Array.isArray(tpEdit.alteracoes) && tpEdit.alteracoes.length === 1,
+    'lista só a alteração que houve', JSON.stringify(tpEdit.alteracoes));
+  ok(tpEdit.alteracoes?.[0]?.campo === 'preco_venda', 'aponta o campo certo');
+  ok(/38,50/.test(tpEdit.alteracoes?.[0]?.de || ''), '"de" traz o valor anterior',
+    tpEdit.alteracoes?.[0]?.de);
+  ok(/45,00/.test(tpEdit.alteracoes?.[0]?.para || ''), '"para" traz o valor novo',
+    tpEdit.alteracoes?.[0]?.para);
+
+  // Reenviar o mesmo valor não é uma alteração — não inventar mudança.
+  const tpIgual = await tool('editar_produto', {
+    busca: `Vergalhao Tool ${marca}`, preco_venda: 45,
+  });
+  ok(tpIgual.ok === true && tpIgual.alteracoes?.length === 0,
+    'editar sem mudar nada devolve alteracoes: []', JSON.stringify(tpIgual.alteracoes));
+  ok(/Nada mudou/.test(tpIgual.resumo || ''), 'resumo diz que nada mudou', tpIgual.resumo);
+
+  console.log('\n🤖 TOOL editar_produto — ambiguidade e ausência');
+  const tpGemeo = await tool('criar_produto', {
+    nome: `Cimento Tool ${marca} CP-III`, unidade: 'saco', preco_venda: 44,
+  });
+  if (tpGemeo.ok) criados.produtos.push(tpGemeo.registro.id);
+
+  // Busca parcial de propósito: "Cimento Tool <marca>" cravado bateria
+  // exato em um dos dois e o desempate resolveria — aqui o que se testa
+  // é o empate de verdade.
+  const tpAmbiguo = await tool('editar_produto', {
+    busca: `mento Tool ${marca}`, preco_venda: 99,
+  });
+  ok(tpAmbiguo.ok === false && Array.isArray(tpAmbiguo.precisa_escolher),
+    'dois nomes parecidos devolvem precisa_escolher', JSON.stringify(tpAmbiguo));
+  ok(tpAmbiguo.precisa_escolher?.length === 2, 'devolve as duas opções');
+  ok(tpAmbiguo.precisa_escolher?.every((o) => o.id && o.rotulo),
+    'cada opção tem id e rótulo legível', JSON.stringify(tpAmbiguo.precisa_escolher));
+  // O que mais importa na ambiguidade: NADA foi gravado.
+  const naoTocado = await produtos.buscarProduto(tp.registro.id);
+  ok(Number(naoTocado.preco_venda) === 42, 'ambiguidade NÃO gravou nada',
+    `preço virou ${naoTocado.preco_venda}`);
+
+  const tpSumido = await tool('editar_produto', {
+    busca: `Nao existe ${marca}`, preco_venda: 1,
+  });
+  ok(tpSumido.ok === false && /Não achei nenhum produto/.test(tpSumido.erro),
+    'nome inexistente devolve erro em português', JSON.stringify(tpSumido));
+
+  console.log('\n🤖 TOOL criar_cliente / editar_cliente');
+  const tc = await tool('criar_cliente', {
+    nome: `Cliente Tool ${marca}`, telefone: '11955554444',
+  });
+  if (tc.ok) criados.clientes.push(tc.registro.id);
+  ok(tc.ok === true && tc.entidade === 'cliente', 'cria com nome e telefone', tc.erro);
+  ok(/sem tipo/.test(tc.resumo || ''), 'resumo diz "sem tipo"', tc.resumo);
+  ok(/sem observação/.test(tc.resumo || ''), 'resumo diz "sem observação"', tc.resumo);
+
+  const tcSemTel = await tool('criar_cliente', { nome: `Sem telefone ${marca}` });
+  ok(tcSemTel.ok === false && /telefone/i.test(tcSemTel.erro),
+    'cliente sem telefone é recusado (NOT NULL)', JSON.stringify(tcSemTel));
+
+  const tcEdit = await tool('editar_cliente', {
+    busca: `Cliente Tool ${marca}`, tipo: 'pedreiro',
+  });
+  ok(tcEdit.ok === true && tcEdit.registro?.tipo === 'pedreiro', 'edita o tipo', tcEdit.erro);
+  ok(tcEdit.registro?.telefone === '11955554444', 'PRESERVA o telefone',
+    `virou ${tcEdit.registro?.telefone}`);
+  ok(tcEdit.alteracoes?.length === 1 && tcEdit.alteracoes[0].de === null,
+    '"de" nulo quando o campo estava vazio', JSON.stringify(tcEdit.alteracoes));
+  const tcTipo = await tool('editar_cliente', { busca: `Cliente Tool ${marca}`, tipo: 'vip' });
+  ok(tcTipo.ok === false && /Tipo inválido/.test(tcTipo.erro),
+    'tipo inválido devolve erro (não lança)', JSON.stringify(tcTipo));
+
+  console.log('\n🔐 TOOL — permissão por papel');
+  const barrado = await tool('criar_produto', {
+    nome: `Nao deveria ${marca}`, unidade: 'saco', preco_venda: 1,
+  }, VENDEDOR);
+  ok(barrado.erro && !barrado.ok, 'vendedor é barrado em criar_produto',
+    JSON.stringify(barrado));
+  const barradoEdit = await tool('editar_produto',
+    { busca: `Cliente Tool ${marca}`, preco_venda: 1 }, VENDEDOR);
+  ok(barradoEdit.erro && !barradoEdit.ok, 'vendedor é barrado em editar_produto');
+  const liberado = await tool('editar_cliente',
+    { busca: `Cliente Tool ${marca}`, observacao: 'anotado no balcão' }, VENDEDOR);
+  ok(liberado.ok === true, 'vendedor PODE editar cliente', JSON.stringify(liberado));
+  // O barrado não pode ter deixado rastro no catálogo.
+  const rastro = await produtos.buscarProdutosPorNome(`Nao deveria ${marca}`);
+  ok(rastro.length === 0, 'tool barrada não gravou nada');
+
+  // ------------------------------------------------------------- FIADOS
+  // A cascata só é testável com um cliente que deve VÁRIAS vendas, e o
+  // banco é o do usuário — então o cenário é montado aqui e derrubado no
+  // fim deste mesmo bloco, sem depender da limpeza geral.
+  console.log('\n💰 FIADO — cascata por cliente');
+
+  const { rows: usuarios } = await query('SELECT id FROM usuario LIMIT 1');
+  const usuarioId = usuarios[0].id;
+  const vendasDeTeste = [];
+
+  // Cria uma venda fiado com data e valor controlados. Sem itens: o saldo
+  // do fiado sai de venda.valor_total, e item_venda não entra na conta.
+  async function vendaFiado(clienteId, valor, diasAtras) {
+    const { rows } = await query(
+      `INSERT INTO venda (cliente_id, usuario_id, forma_pagamento, valor_total, vendida_em)
+       VALUES ($1, $2, 'fiado', $3, NOW() - ($4 || ' days')::interval)
+       RETURNING id, vendida_em`,
+      [clienteId, usuarioId, valor, String(diasAtras)]
+    );
+    vendasDeTeste.push(rows[0].id);
+    return rows[0];
+  }
+
+  // Devedor com duas dívidas: 100 (mais antiga) e 300.
+  const devedor = await clientes.criarCliente({
+    nome: `Devedor ${marca}`, telefone: '11900000001', tipo: 'pedreiro',
+  });
+  criados.clientes.push(devedor.id);
+  const antiga = await vendaFiado(devedor.id, 100, 30);
+  const nova = await vendaFiado(devedor.id, 300, 5);
+
+  const fila = await fiados.fiadosDoCliente(devedor.id);
+  ok(fila.length === 2, 'fiadosDoCliente traz as duas dívidas', `veio ${fila.length}`);
+  ok(fila[0].id === antiga.id, 'ordena da mais ANTIGA para a mais nova');
+  ok(await fiados.totalDevidoPeloCliente(devedor.id) === 400, 'total devido soma 400');
+
+  // O caso central: 150 quita a de 100 e sobra 50 para a de 300.
+  const cascata = await fiados.registrarPagamentoEmCascata({
+    cliente_id: devedor.id, valor: 150, usuario_id: usuarioId,
+  });
+  ok(cascata.abatimentos.length === 2, 'cascata discrimina as DUAS vendas',
+    JSON.stringify(cascata.abatimentos));
+  ok(cascata.abatimentos[0].venda_id === antiga.id
+    && cascata.abatimentos[0].abatido === 100
+    && cascata.abatimentos[0].quitada === true,
+    'a mais antiga recebe 100 e fica quitada');
+  ok(cascata.abatimentos[1].venda_id === nova.id
+    && cascata.abatimentos[1].abatido === 50
+    && cascata.abatimentos[1].saldo_depois === 250,
+    'a sobra de 50 entra na mais nova, que fica devendo 250');
+  ok(cascata.total_devido_depois === 250 && cascata.quitou_tudo === false,
+    'saldo restante do cliente é 250');
+  ok(await fiados.totalDevidoPeloCliente(devedor.id) === 250,
+    'o banco confirma os 250');
+
+  // Valor maior que o total devido: recusa e NÃO grava — nunca gera crédito.
+  const antesDoEstouro = (await query(
+    'SELECT COUNT(*)::int AS n FROM pagamento_fiado WHERE venda_id = ANY($1)',
+    [vendasDeTeste]
+  )).rows[0].n;
+  await esperaErro(() => fiados.registrarPagamentoEmCascata({
+    cliente_id: devedor.id, valor: 1000, usuario_id: usuarioId,
+  }), 'Valor recebido (R$ 1000.00) é maior que o total devido pelo cliente (R$ 250.00)',
+    'valor acima do devido é recusado');
+  const depoisDoEstouro = (await query(
+    'SELECT COUNT(*)::int AS n FROM pagamento_fiado WHERE venda_id = ANY($1)',
+    [vendasDeTeste]
+  )).rows[0].n;
+  ok(depoisDoEstouro === antesDoEstouro, 'estouro não gravou NADA no banco',
+    `pagamentos: ${antesDoEstouro} -> ${depoisDoEstouro}`);
+  ok(await fiados.totalDevidoPeloCliente(devedor.id) === 250,
+    'saldo do cliente intacto depois do estouro');
+
+  // Pagamento parcial e depois quitação exata do que restou.
+  const parcialFiado = await fiados.registrarPagamentoEmCascata({
+    cliente_id: devedor.id, valor: 50, usuario_id: usuarioId,
+  });
+  ok(parcialFiado.total_devido_depois === 200, 'parcial deixa saldo de 200');
+  const quitacao = await fiados.registrarPagamentoEmCascata({
+    cliente_id: devedor.id, valor: 200, usuario_id: usuarioId,
+  });
+  ok(quitacao.quitou_tudo === true && quitacao.abatimentos.length === 1,
+    'valor exato quita a única dívida restante');
+  ok((await fiados.fiadosDoCliente(devedor.id)).length === 0,
+    'cliente sai da lista de devedores');
+
+  // Cliente sem dívida nenhuma.
+  await esperaErro(() => fiados.registrarPagamentoEmCascata({
+    cliente_id: devedor.id, valor: 10,
+  }), 'Este cliente não tem fiado em aberto', 'cliente sem dívida avisa claro');
+  await esperaErro(() => fiados.registrarPagamentoEmCascata({
+    cliente_id: devedor.id, valor: 0,
+  }), 'Valor do pagamento deve ser maior que zero', 'valor zero é barrado');
+
+  console.log('\n💰 FIADO — tool do Zé');
+  // Esta tool GRAVA autoria (pagamento_fiado.usuario_id é FK). DONO e
+  // VENDEDOR já carregam um id real — ver carregarUsuarioReal().
+  const devedor2 = await clientes.criarCliente({
+    nome: `Fiadeiro ${marca}`, telefone: '11900000002', tipo: 'pedreiro',
+  });
+  criados.clientes.push(devedor2.id);
+  await vendaFiado(devedor2.id, 80, 20);
+  await vendaFiado(devedor2.id, 120, 2);
+
+  const tPago = await tool('registrar_pagamento_fiado',
+    { cliente: `Fiadeiro ${marca}`, valor: 100 }, VENDEDOR);
+  ok(tPago.ok === true, 'vendedor PODE registrar pagamento', JSON.stringify(tPago));
+  ok(Array.isArray(tPago.registro) && tPago.registro.length === 2,
+    'a tool devolve o registro discriminado por venda');
+  ok(tPago.total_devido_depois === 100, 'a tool devolve o saldo restante');
+  ok(/quitaram a venda de/.test(tPago.resumo) && /ainda deve/.test(tPago.resumo),
+    'o resumo diz onde entrou e quanto resta', tPago.resumo);
+
+  const tExcesso = await tool('registrar_pagamento_fiado',
+    { cliente: `Fiadeiro ${marca}`, valor: 999 }, DONO);
+  ok(tExcesso.ok === false && /maior que o total devido/.test(tExcesso.erro),
+    'a tool devolve o erro em vez de lançar', JSON.stringify(tExcesso));
+
+  const tNinguem = await tool('registrar_pagamento_fiado',
+    { cliente: `Inexistente ${marca}`, valor: 10 }, DONO);
+  ok(tNinguem.ok === false && /Não achei nenhum cliente/.test(tNinguem.erro),
+    'cliente inexistente vira erro claro');
+
+  // Ambíguo: os dois clientes de teste compartilham o sufixo `marca`.
+  const tAmbiguo = await tool('registrar_pagamento_fiado',
+    { cliente: String(marca), valor: 10 }, DONO);
+  ok(tAmbiguo.ok === false && Array.isArray(tAmbiguo.precisa_escolher)
+    && tAmbiguo.precisa_escolher.length >= 2,
+    'nome ambíguo devolve precisa_escolher', JSON.stringify(tAmbiguo));
+
+  // Ambiguidade não pode ter gravado nada por conta própria.
+  ok(await fiados.totalDevidoPeloCliente(devedor2.id) === 100,
+    'nada foi gravado no caso ambíguo');
+
+  // Caminho por venda_id: a tool recusa venda que não é do cliente citado.
+  const tVendaAlheia = await tool('registrar_pagamento_fiado',
+    { cliente: `Fiadeiro ${marca}`, valor: 10, venda_id: antiga.id }, DONO);
+  ok(tVendaAlheia.ok === false && /não é uma dívida em aberto/.test(tVendaAlheia.erro),
+    'venda de outro cliente é recusada');
+
+  // Limpeza do cenário de fiado, na ordem que as FKs exigem.
+  await query('DELETE FROM pagamento_fiado WHERE venda_id = ANY($1)', [vendasDeTeste]);
+  await query('DELETE FROM item_venda WHERE venda_id = ANY($1)', [vendasDeTeste]);
+  await query('DELETE FROM venda WHERE id = ANY($1)', [vendasDeTeste]);
+  const sobrou = (await query(
+    'SELECT COUNT(*)::int AS n FROM venda WHERE id = ANY($1)', [vendasDeTeste]
+  )).rows[0].n;
+  ok(sobrou === 0, 'vendas de teste removidas', `sobraram ${sobrou}`);
+
   // Limpeza — nada de lixo de teste no banco do usuário.
   console.log('\n🧹 LIMPEZA');
   for (const id of criados.produtos) await produtos.removerProduto(id);
   for (const id of criados.clientes) await clientes.removerCliente(id);
   ok(await produtos.buscarProduto(criados.produtos[0]) === null, 'produto de teste removido');
   ok(await clientes.buscarCliente(criados.clientes[0]) === null, 'cliente de teste removido');
+  // A marca é única por execução: sobrar qualquer coisa com ela é resíduo.
+  ok((await produtos.buscarProdutosPorNome(String(marca))).length === 0,
+    'nenhum produto de teste sobrou');
+  ok((await clientes.buscarClientesPorNome(String(marca))).length === 0,
+    'nenhum cliente de teste sobrou');
 
   console.log(`\n${falhou === 0 ? '✅' : '❌'} ${passou} passaram, ${falhou} falharam\n`);
   return falhou === 0;

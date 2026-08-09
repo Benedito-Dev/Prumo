@@ -4,8 +4,10 @@
 // argumentos. Cada tool é um envelope fino sobre uma query que já existe
 // nos controllers do Painel, Fiados e Clientes.
 //
-// Todas são SOMENTE LEITURA — nenhuma cria venda, paga fiado ou altera
-// cadastro. Um assistente que só lê não causa dano por interpretação errada.
+// As 7 tools deste arquivo são SOMENTE LEITURA. As de escrita moram em
+// arquivos por domínio (tools.produto.js, tools.cliente.js, …) e entram
+// aqui pelo spread no fim do catálogo — um arquivo por domínio para que
+// duas frentes de trabalho não briguem pelas mesmas linhas.
 //
 // Formato de cada entrada:
 //   schema   -> o que vai para o modelo (function calling da OpenAI)
@@ -15,6 +17,9 @@
 
 import { query } from '../config/db.js';
 import { resolverPeriodo, mesCorrenteEAnterior } from '../painel/periodo.js';
+import { TOOLS_FIADO } from './tools.fiado.js';
+import { TOOLS_PRODUTO } from './tools.produto.js';
+import { TOOLS_CLIENTE } from './tools.cliente.js';
 
 const PERIODOS = ['hoje', 'semana', 'mes', 'ano'];
 
@@ -347,6 +352,11 @@ export const TOOLS = {
       };
     },
   },
+
+  // ---------------------------------------------------------- escrita
+  ...TOOLS_PRODUTO,
+  ...TOOLS_CLIENTE,
+  ...TOOLS_FIADO,
 };
 
 // Tools que o papel pode usar. O catálogo enviado ao modelo já vai filtrado,

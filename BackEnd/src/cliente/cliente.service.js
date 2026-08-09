@@ -113,6 +113,21 @@ export async function atualizarClienteParcial(id, alteracoes = {}) {
   return atualizarCliente(id, merged);
 }
 
+// Busca por nome parcial, para o Zé traduzir "o Marcos" em um registro.
+// Diferente de listarClientes({ busca }), não procura por telefone: quem
+// fala com o assistente diz o nome. Teto de 10 para não despejar a
+// agenda inteira no modelo.
+export async function buscarClientesPorNome(termo) {
+  const busca = String(termo ?? '').trim();
+  if (!busca) return [];
+
+  const { rows } = await query(
+    'SELECT * FROM cliente WHERE nome ILIKE $1 ORDER BY nome LIMIT 10',
+    [`%${busca}%`]
+  );
+  return rows;
+}
+
 export async function removerCliente(id) {
   let rowCount;
   try {

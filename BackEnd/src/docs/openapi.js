@@ -143,7 +143,7 @@ const schemas = {
   },
   VendaEntrada: {
     type: 'object',
-    required: ['usuario_id', 'forma_pagamento', 'itens'],
+    required: ['forma_pagamento', 'itens'],
     properties: {
       cliente_id: {
         type: 'string',
@@ -151,7 +151,7 @@ const schemas = {
         nullable: true,
         description: 'Ausente/null = venda "Consumidor"',
       },
-      usuario_id: { type: 'string', format: 'uuid', description: 'Quem vendeu (obrigatório)' },
+      // usuario_id NÃO entra aqui: quem vendeu sai do token de acesso.
       forma_pagamento: {
         type: 'string',
         enum: ['dinheiro', 'pix', 'cartao', 'fiado'],

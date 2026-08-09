@@ -68,20 +68,22 @@ export async function buscarVenda(req, res) {
 }
 
 // POST /api/vendas
-// Corpo: { cliente_id?, usuario_id, forma_pagamento, itens: [{ produto_id, quantidade, preco_unitario? }] }
+// Corpo: { cliente_id?, forma_pagamento, itens: [{ produto_id, quantidade, preco_unitario? }] }
 // cliente_id ausente/null = venda "Consumidor" (RF03).
 // preco_unitario por item é opcional: se não vier, usa o preço atual do produto;
 // se vier, respeita a negociação do balcão (RF12).
+//
+// Quem vendeu sai do TOKEN, nunca do corpo: antes vinha em usuario_id, o que
+// permitia lançar venda no nome de outro vendedor e fazer o RF20
+// (vendas-por-vendedor) mentir. O campo no corpo é ignorado.
 export async function criarVenda(req, res) {
-  const { cliente_id, usuario_id, forma_pagamento, itens, desconto } = req.body;
+  const { cliente_id, forma_pagamento, itens, desconto } = req.body;
+  const usuario_id = req.usuario.id;
   const descontoNum = Number(desconto) || 0;
 
   // --- Validações (antes de abrir a transação) ---
   if (descontoNum < 0) {
     return res.status(400).json({ erro: 'desconto não pode ser negativo' });
-  }
-  if (!usuario_id) {
-    return res.status(400).json({ erro: 'usuario_id (quem vendeu) é obrigatório' });
   }
   if (!forma_pagamento || !FORMAS_PAGAMENTO.includes(forma_pagamento)) {
     return res.status(400).json({ erro: `forma_pagamento inválida. Use: ${FORMAS_PAGAMENTO.join(', ')}` });

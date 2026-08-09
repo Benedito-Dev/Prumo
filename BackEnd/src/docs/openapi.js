@@ -94,7 +94,7 @@ const schemas = {
       id: { type: 'string', format: 'uuid' },
       nome: { type: 'string', example: 'Benedito' },
       email: { type: 'string', format: 'email', example: 'benedito@prumo.com' },
-      papel: { type: 'string', enum: ['dono', 'vendedor', 'caixa', 'estoque'] },
+      papel: { type: 'string', enum: ['dono', 'vendedor'] },
       ativo: { type: 'boolean' },
       criado_em: { type: 'string', format: 'date-time' },
     },
@@ -106,7 +106,7 @@ const schemas = {
       nome: { type: 'string', example: 'Benedito' },
       email: { type: 'string', format: 'email', example: 'benedito@prumo.com' },
       senha: { type: 'string', format: 'password', example: 'segredo123' },
-      papel: { type: 'string', enum: ['dono', 'vendedor', 'caixa', 'estoque'] },
+      papel: { type: 'string', enum: ['dono', 'vendedor'] },
     },
   },
 

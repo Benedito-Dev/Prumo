@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import { query } from '../config/db.js';
 import { conferirSenha, gerarHash } from '../auth/senha.service.js';
 
-const PAPEIS_VALIDOS = ['dono', 'vendedor', 'caixa', 'estoque'];
+const PAPEIS_VALIDOS = ['dono', 'vendedor'];
 const SENHA_MINIMA = 4;
 
 // Colunas seguras para retornar — NUNCA inclui senha_hash.
@@ -64,7 +64,9 @@ export async function criarUsuario(req, res) {
       `INSERT INTO usuario (nome, email, senha_hash, papel)
        VALUES ($1, $2, $3, $4)
        RETURNING ${COLUNAS_PUBLICAS}`,
-      [nome, email.trim().toLowerCase(), senha_hash, papel ?? 'dono']
+      // Sem papel informado, cria o de MENOR privilégio. Antes o default
+      // era 'dono' — quem esquecesse o campo ganhava um administrador.
+      [nome, email.trim().toLowerCase(), senha_hash, papel ?? 'vendedor']
     );
     res.status(201).json(resultado.rows[0]);
   } catch (erro) {

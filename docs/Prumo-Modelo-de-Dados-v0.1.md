@@ -95,7 +95,7 @@ erDiagram
 | `nome` | texto | ✔ | Nome exibido no ranking de vendedores. |
 | `login` | texto | ✔ | Único. No MVP pode haver um único registro (o dono). |
 | `senha_hash` | texto | ✔ | Nunca armazenar senha em texto puro. |
-| `papel` | texto | ✔ | `dono`, `vendedor`, `caixa`, `estoque`. No MVP: só `dono`. Gancho para RNF05. |
+| `papel` | texto | ✔ | `dono` (administra usuários) ou `vendedor` (opera o balcão). Default: `vendedor`. Gancho para RNF05. |
 | `ativo` | booleano | ✔ | Desativa sem apagar (preserva histórico de vendas). |
 | `criado_em` | timestamp | ✔ | |
 

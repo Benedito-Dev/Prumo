@@ -4,8 +4,6 @@ import { api } from './api';
 export const PAPEIS = [
   { id: 'dono', rotulo: 'Dono' },
   { id: 'vendedor', rotulo: 'Vendedor' },
-  { id: 'caixa', rotulo: 'Caixa' },
-  { id: 'estoque', rotulo: 'Estoque' },
 ];
 
 export const usuariosService = {

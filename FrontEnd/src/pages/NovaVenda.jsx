@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Search, Plus, Trash2, UserPlus, X, Check } from 'lucide-react';
 import LayoutApp from '../components/LayoutApp';
 import { vendasService } from '../services/vendas';
-import { useAuth } from '../auth/AuthContext';
 import { moeda } from '../utils/formato';
 
 const PAGAMENTOS = [
@@ -15,7 +14,6 @@ const PAGAMENTOS = [
 
 export default function NovaVenda() {
   const navigate = useNavigate();
-  const { usuario } = useAuth();
 
   const [cliente, setCliente] = useState(null); // null = Consumidor
   const [itens, setItens] = useState([]); // { produto_id, nome, unidade, quantidade, preco_unitario }
@@ -88,9 +86,9 @@ export default function NovaVenda() {
 
     setSalvando(true);
     try {
+      // Quem vendeu sai do token no back — não se manda usuario_id daqui.
       const venda = await vendasService.criarVenda({
         cliente_id: cliente?.id ?? null,
-        usuario_id: usuario.id,
         forma_pagamento: pagamento,
         desconto: Number(desconto.toFixed(2)),
         itens: itens.map((i) => ({

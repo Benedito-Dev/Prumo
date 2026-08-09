@@ -152,35 +152,45 @@ export default function Fiados() {
 
                 return (
                   <div key={chave}>
-                    {/* cabeçalho do cliente */}
-                    <div className="flex items-center gap-3 px-4 sm:px-5 py-3">
-                      {/* área clicável: abre/fecha as dívidas */}
-                      <button
-                        onClick={alternar}
-                        aria-expanded={!!aberto}
-                        className="flex items-center gap-3 flex-1 min-w-0 text-left py-1 rounded-p hover:bg-concreto/40"
-                      >
-                        <span
-                          className="w-12 h-12 rounded-full font-bold text-[16px] flex items-center justify-center shrink-0"
-                          style={{ backgroundColor: cor.bg, color: cor.texto }}
+                    {/* Cabeçalho do cliente. Até sm vira duas faixas: nome e
+                        valor em cima, "Receber" numa linha própria — os três
+                        lado a lado deixam ~80px para o nome num celular. */}
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 px-4 sm:px-5 py-3">
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        {/* área clicável: abre/fecha as dívidas */}
+                        <button
+                          onClick={alternar}
+                          aria-expanded={!!aberto}
+                          className="flex items-center gap-3 flex-1 min-w-0 text-left py-1 rounded-p hover:bg-concreto/40"
                         >
-                          {iniciais(g.nome)}
-                        </span>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[16px] font-bold truncate">{g.nome}</p>
-                          <p className="text-[13px] text-grafite-medio flex items-center gap-1">
-                            {aberto ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                            {umaSo ? 'ver a dívida' : `ver as ${g.vendas.length} dívidas`}
-                            {g.telefone ? ` · ${g.telefone}` : ''}
+                          <span
+                            className="w-11 h-11 sm:w-12 sm:h-12 rounded-full font-bold text-[15px] sm:text-[16px] flex items-center justify-center shrink-0"
+                            style={{ backgroundColor: cor.bg, color: cor.texto }}
+                          >
+                            {iniciais(g.nome)}
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[16px] font-bold truncate">{g.nome}</p>
+                            <p className="text-[13px] text-grafite-medio flex items-center gap-1">
+                              {aberto ? (
+                                <ChevronDown size={14} className="shrink-0" />
+                              ) : (
+                                <ChevronRight size={14} className="shrink-0" />
+                              )}
+                              <span className="truncate">
+                                {umaSo ? 'ver a dívida' : `ver as ${g.vendas.length} dívidas`}
+                                {g.telefone ? ` · ${g.telefone}` : ''}
+                              </span>
+                            </p>
+                          </div>
+                        </button>
+
+                        <div className="text-right shrink-0">
+                          <p className="text-[10px] font-bold uppercase text-grafite-medio">Deve</p>
+                          <p className="text-[20px] font-bold tabular-nums text-trena-escuro leading-tight">
+                            {moeda(g.total)}
                           </p>
                         </div>
-                      </button>
-
-                      <div className="text-right shrink-0">
-                        <p className="text-[10px] font-bold uppercase text-grafite-medio">Deve</p>
-                        <p className="text-[20px] font-bold tabular-nums text-trena-escuro leading-tight">
-                          {moeda(g.total)}
-                        </p>
                       </div>
 
                       {/* Ação principal. Sempre abre o modal, já na dívida mais
@@ -188,7 +198,7 @@ export default function Fiados() {
                           primeiro. Pra pagar outra, basta expandir e escolher. */}
                       <button
                         onClick={() => setPagando(g.vendas[0])}
-                        className="shrink-0 px-4 sm:px-5 h-12 rounded-p bg-nivel text-white text-[14px] font-bold hover:bg-nivel/90"
+                        className="shrink-0 w-full sm:w-auto px-4 sm:px-5 h-12 rounded-p bg-nivel text-white text-[14px] font-bold hover:bg-nivel/90"
                       >
                         Receber
                       </button>
@@ -196,13 +206,13 @@ export default function Fiados() {
 
                     {/* dívidas do cliente (expandido) */}
                     {aberto && (
-                      <div className="bg-concreto/30 px-5 pb-3">
+                      <div className="bg-concreto/30 px-4 sm:px-5 pb-3">
                         {g.vendas.map((d) => (
                           <div
                             key={d.id}
-                            className="flex items-center gap-3 py-2.5 border-t border-linha/60 first:border-t-0"
+                            className="flex flex-wrap items-center gap-x-3 gap-y-2 py-2.5 border-t border-linha/60 first:border-t-0"
                           >
-                            <div className="flex-1">
+                            <div className="flex-1 min-w-0">
                               <p className="text-[13px] font-medium">
                                 Venda de {new Date(d.vendida_em).toLocaleDateString('pt-BR')}
                               </p>

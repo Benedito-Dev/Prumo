@@ -68,15 +68,17 @@ export default function ClienteDetalhe() {
         </button>
       }
     >
-      <div className="flex flex-col gap-4 h-[calc(100vh-56px-32px)] min-h-[500px]">
+      {/* Até sm o cabeçalho empilha e fica mais alto: prender a altura em
+          100vh espremeria o histórico. Ali a altura é piso, não teto. */}
+      <div className="flex flex-col gap-4 min-h-[500px] sm:h-[calc(100vh-56px-32px)]">
         {/* cabeçalho do cliente */}
-        <div className="bg-superficie border border-linha rounded-md p-5 flex items-center gap-4">
-          <span className="w-16 h-16 rounded-full bg-trena/15 text-trena font-bold text-[26px] flex items-center justify-center shrink-0">
+        <div className="bg-superficie border border-linha rounded-md p-5 flex flex-col sm:flex-row sm:items-center gap-4">
+          <span className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-trena/15 text-trena font-bold text-[22px] sm:text-[26px] flex items-center justify-center shrink-0">
             {cliente.nome.charAt(0).toUpperCase()}
           </span>
-          <div className="flex-1">
-            <div className="flex items-center gap-2">
-              <h2 className="text-[20px] font-bold">{cliente.nome}</h2>
+          <div className="flex-1 min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-[18px] sm:text-[20px] font-bold min-w-0 break-words">{cliente.nome}</h2>
               {sumido && (
                 <span className="flex items-center gap-1 text-[11px] font-bold uppercase text-prumo bg-prumo/10 px-2 py-0.5 rounded">
                   <AlertTriangle size={12} /> Sumido

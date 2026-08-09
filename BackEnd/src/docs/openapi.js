@@ -94,7 +94,7 @@ const schemas = {
       id: { type: 'string', format: 'uuid' },
       nome: { type: 'string', example: 'Benedito' },
       email: { type: 'string', format: 'email', example: 'benedito@prumo.com' },
-      papel: { type: 'string', enum: ['dono', 'vendedor', 'caixa', 'estoque'] },
+      papel: { type: 'string', enum: ['dono', 'vendedor'] },
       ativo: { type: 'boolean' },
       criado_em: { type: 'string', format: 'date-time' },
     },
@@ -106,7 +106,7 @@ const schemas = {
       nome: { type: 'string', example: 'Benedito' },
       email: { type: 'string', format: 'email', example: 'benedito@prumo.com' },
       senha: { type: 'string', format: 'password', example: 'segredo123' },
-      papel: { type: 'string', enum: ['dono', 'vendedor', 'caixa', 'estoque'] },
+      papel: { type: 'string', enum: ['dono', 'vendedor'] },
     },
   },
 
@@ -143,7 +143,7 @@ const schemas = {
   },
   VendaEntrada: {
     type: 'object',
-    required: ['usuario_id', 'forma_pagamento', 'itens'],
+    required: ['forma_pagamento', 'itens'],
     properties: {
       cliente_id: {
         type: 'string',
@@ -151,7 +151,7 @@ const schemas = {
         nullable: true,
         description: 'Ausente/null = venda "Consumidor"',
       },
-      usuario_id: { type: 'string', format: 'uuid', description: 'Quem vendeu (obrigatório)' },
+      // usuario_id NÃO entra aqui: quem vendeu sai do token de acesso.
       forma_pagamento: {
         type: 'string',
         enum: ['dinheiro', 'pix', 'cartao', 'fiado'],

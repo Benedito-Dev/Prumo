@@ -245,7 +245,7 @@ Implementar o filtro agora é bem mais barato que retroagir depois.
 
 ### O desenho
 
-| Tool | dono | vendedor / caixa / estoque |
+| Tool | dono | vendedor |
 |---|:---:|:---:|
 | `resumo_do_periodo` | ✅ | ❌ |
 | `faturamento_do_mes` | ✅ | ❌ |
@@ -257,7 +257,7 @@ Implementar o filtro agora é bem mais barato que retroagir depois.
 
 O catálogo enviado ao modelo é **filtrado antes da chamada** — o modelo nem sabe que a tool existe, então não tem como pedir. Se ainda assim pedir (nome alucinado), a validação da camada 3 barra.
 
-> 📌 **Ponto para você decidir:** essa tabela é minha sugestão, não uma verdade. Se o vendedor deve ver o próprio desempenho, ou se o caixa precisa do resumo do dia, é ajuste de uma linha. **Vale revisar antes de eu implementar.**
+> 📌 **Ponto para você decidir:** essa tabela é minha sugestão, não uma verdade. Se o vendedor deve ver o próprio desempenho, é ajuste de uma linha. **Vale revisar antes de eu implementar.**
 
 ---
 

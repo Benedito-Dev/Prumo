@@ -15,8 +15,11 @@ CREATE TABLE usuario (
     nome         VARCHAR(120) NOT NULL,
     email        VARCHAR(160) NOT NULL UNIQUE,
     senha_hash   VARCHAR(255) NOT NULL,
-    papel        VARCHAR(20)  NOT NULL DEFAULT 'dono'
-                 CHECK (papel IN ('dono', 'vendedor', 'caixa', 'estoque')),
+    -- Só dois papéis: 'dono' administra usuários (requireDono), 'vendedor'
+    -- opera o balcão. 'caixa' e 'estoque' existiam como rótulo mas nenhum
+    -- código os diferenciava de 'vendedor' — removidos.
+    papel        VARCHAR(20)  NOT NULL DEFAULT 'vendedor'
+                 CHECK (papel IN ('dono', 'vendedor')),
     ativo        BOOLEAN      NOT NULL DEFAULT TRUE,
     criado_em    TIMESTAMP    NOT NULL DEFAULT NOW()
 );

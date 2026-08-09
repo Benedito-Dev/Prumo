@@ -71,17 +71,19 @@ export default function UsuarioDetalhe() {
         </button>
       }
     >
-      <div className="h-[calc(100vh-56px-32px)] min-h-[500px] grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4">
+      {/* A altura travada só vale a partir de lg — no mobile as colunas
+          empilham e precisam crescer com o conteúdo, senão ele vaza. */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4 lg:h-[calc(100vh-56px-32px)] lg:min-h-[500px]">
         {/* ---- coluna principal ---- */}
         <div className="flex flex-col gap-4 min-w-0">
           {/* cabeçalho */}
-          <div className="bg-superficie border border-linha rounded-md p-6 flex items-center gap-5">
-            <span className="w-20 h-20 rounded-full bg-trena/15 text-trena-escuro font-bold text-[32px] flex items-center justify-center shrink-0">
+          <div className="bg-superficie border border-linha rounded-md p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-5">
+            <span className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-trena/15 text-trena-escuro font-bold text-[26px] sm:text-[32px] flex items-center justify-center shrink-0">
               {usuario.nome.charAt(0).toUpperCase()}
             </span>
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <h2 className="text-[24px] font-bold truncate">{usuario.nome}</h2>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-[20px] sm:text-[24px] font-bold min-w-0 break-words">{usuario.nome}</h2>
                 {souEu && (
                   <span className="text-[11px] font-bold uppercase text-nivel bg-nivel/10 px-2 py-0.5 rounded shrink-0">você</span>
                 )}
@@ -102,13 +104,13 @@ export default function UsuarioDetalhe() {
           </div>
 
           {/* desempenho de vendas — ocupa o resto da altura */}
-          <div className="flex-1 flex flex-col min-h-0 bg-superficie border border-linha rounded-md p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <TrendingUp size={16} className="text-grafite-medio" />
+          <div className="flex-1 flex flex-col min-h-0 bg-superficie border border-linha rounded-md p-5 sm:p-6">
+            <div className="flex flex-wrap items-center gap-2 mb-4">
+              <TrendingUp size={16} className="text-grafite-medio shrink-0" />
               <p className="text-[13px] font-semibold text-grafite">Desempenho como vendedor</p>
               <span className="text-[11px] text-grafite-medio">(no ano)</span>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
               <Indicador Icone={Wallet} rotulo="Total vendido" valor={moeda(totalVendido)} destaque />
               <Indicador Icone={Receipt} rotulo="Nº de vendas" valor={numero(qtdVendas)} />
               <Indicador Icone={TrendingUp} rotulo="Ticket médio" valor={moeda(ticket)} />
@@ -122,7 +124,7 @@ export default function UsuarioDetalhe() {
         </div>
 
         {/* ---- lateral de ações ---- */}
-        <div className="bg-superficie border border-linha rounded-md p-6 flex flex-col">
+        <div className="bg-superficie border border-linha rounded-md p-5 sm:p-6 flex flex-col lg:self-start">
           <p className="text-[10.5px] font-bold uppercase tracking-wide text-grafite-medio mb-4">Ações</p>
           <div className="flex flex-col gap-2">
             <button

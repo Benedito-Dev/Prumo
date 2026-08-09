@@ -104,7 +104,7 @@ export default function Vendas() {
         </button>
       }
     >
-      <div className="flex flex-col gap-4 h-[calc(100vh-56px-32px)] min-h-[500px]">
+      <div className="flex flex-col gap-4 h-full min-h-[500px]">
         {/* KPIs */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 shrink-0">
           <KpiV rotulo="Faturado no período" valor={moeda(total)} destaque />

@@ -92,7 +92,7 @@ export default function Clientes() {
         </button>
       }
     >
-      <div className="flex flex-col gap-4 h-[calc(100vh-56px-32px)] min-h-[500px]">
+      <div className="flex flex-col gap-4 h-full min-h-[500px]">
         {/* ---- faixa de KPIs ---- */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 shrink-0">
           <KpiCli Icone={Users} rotulo="Total de clientes" valor={numero(totalClientes)} />

@@ -85,6 +85,14 @@ export default function Assistente() {
   const vazio = mensagens.length === 0;
   const primeiroNome = usuario?.nome?.split(' ')[0];
 
+  // A última proposta em aberto. Só ela mostra botões ativos: propostas
+  // anteriores viraram história, e confirmar uma delas seria agir sobre
+  // um contexto que já mudou.
+  const indiceUltimaProposta = mensagens.reduce(
+    (ultimo, m, i) => (m.acaoPendente ? i : ultimo),
+    -1
+  );
+
   return (
     <LayoutApp
       titulo="Zé"
@@ -99,7 +107,13 @@ export default function Assistente() {
         )
       }
     >
-      <div className="h-[calc(100vh-56px-32px)] min-h-[500px] flex flex-col max-w-[820px] mx-auto">
+      {/* Altura própria em vez de 100vh: a topbar (56px) e o padding do
+          main (32px) já foram gastos, e somar 100vh aqui empurrava a
+          página inteira — a janela ganhava uma barra de rolagem além da
+          da conversa. `100%` respeita o espaço que o layout deu.
+          A altura mínima some no mobile: com o teclado aberto sobra
+          pouca tela, e forçar 500px reintroduz a rolagem dupla. */}
+      <div className="h-full min-h-[420px] sm:min-h-[500px] flex flex-col max-w-[820px] mx-auto">
         {/* ---------- conversa ---------- */}
         <div className="flex-1 min-h-0 overflow-y-auto">
           {vazio ? (
@@ -110,10 +124,12 @@ export default function Assistente() {
                 <Mensagem
                   key={i}
                   {...m}
-                  // Só a última mensagem tem botão clicável: confirmar
-                  // algo de três turnos atrás é agir sobre um contexto
-                  // que já mudou.
-                  ehUltima={i === mensagens.length - 1}
+                  // Clicável só a proposta MAIS RECENTE — e ela continua
+                  // clicável mesmo que a pessoa digite outra coisa
+                  // depois. Amarrar isso a "é a última mensagem" fazia
+                  // os botões sumirem no instante em que se digitava,
+                  // deixando a nota órfã na tela.
+                  ehUltima={i === indiceUltimaProposta}
                   pensando={pensando}
                   onConfirmar={(token) => enviar('Sim, pode fazer.', token)}
                   onCancelar={() => enviar('Não, deixa pra lá.')}

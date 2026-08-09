@@ -70,7 +70,7 @@ export default function ClienteDetalhe() {
     >
       {/* Até sm o cabeçalho empilha e fica mais alto: prender a altura em
           100vh espremeria o histórico. Ali a altura é piso, não teto. */}
-      <div className="flex flex-col gap-4 min-h-[500px] sm:h-[calc(100vh-56px-32px)]">
+      <div className="flex flex-col gap-4 min-h-[500px] sm:h-full">
         {/* cabeçalho do cliente */}
         <div className="bg-superficie border border-linha rounded-md p-5 flex flex-col sm:flex-row sm:items-center gap-4">
           <span className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-trena/15 text-trena font-bold text-[22px] sm:text-[26px] flex items-center justify-center shrink-0">

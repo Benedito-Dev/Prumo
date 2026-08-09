@@ -154,9 +154,16 @@ export default function LayoutApp({ titulo, periodo, acao, children }) {
       </aside>
 
       {/* ---------- ÁREA DE CONTEÚDO ---------- */}
-      <div className="lg:ml-[210px] flex flex-col min-h-screen min-w-0">
+      {/* h-screen (não min-h): a área de conteúdo ocupa exatamente a
+          tela, e quem rola é o miolo de cada página. Com min-h-screen,
+          uma página que também pedia 100vh de altura empurrava o corpo
+          e a janela ganhava uma segunda barra de rolagem. */}
+      <div className="lg:ml-[210px] flex flex-col h-screen min-w-0">
         {/* topbar leve */}
-        <header className="h-14 bg-superficie border-b border-linha flex items-center justify-between gap-2 px-3 sm:px-5 sticky top-0 z-20">
+        {/* shrink-0 em vez de sticky: a topbar é irmã do <main> rolável,
+            então já fica fixa por construção — o que ela não pode é ser
+            espremida quando o conteúdo cresce. */}
+        <header className="h-14 bg-superficie border-b border-linha flex items-center justify-between gap-2 px-3 sm:px-5 shrink-0 z-20">
           <div className="flex items-center gap-1.5 sm:gap-3 min-w-0">
             <button
               onClick={() => setMenuAberto(true)}
@@ -187,7 +194,11 @@ export default function LayoutApp({ titulo, periodo, acao, children }) {
         </header>
 
         {/* conteúdo */}
-        <main className="flex-1 px-3 sm:px-5 py-4 w-full min-w-0">{children}</main>
+        {/* Quem rola é aqui dentro, não a janela. min-h-0 é o que
+            permite o flex encolher e a barra aparecer no lugar certo. */}
+        <main className="flex-1 min-h-0 overflow-y-auto px-3 sm:px-5 py-4 w-full min-w-0">
+          {children}
+        </main>
       </div>
 
       {trocandoSenha && <ModalTrocarSenha onFechar={() => setTrocandoSenha(false)} />}

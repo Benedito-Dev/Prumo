@@ -120,7 +120,7 @@ export default function NovaVenda() {
   if (vendaSalva) {
     return (
       <LayoutApp titulo="Venda registrada">
-        <div className="flex items-center justify-center h-[calc(100vh-56px-32px)] min-h-[500px]">
+        <div className="flex items-center justify-center h-full min-h-[500px]">
           <div className="bg-superficie border border-linha rounded-md px-8 py-10 max-w-[420px] w-full text-center">
             <div className="w-14 h-14 rounded-full bg-nivel/10 flex items-center justify-center mx-auto mb-5">
               <Check size={28} className="text-nivel" strokeWidth={2.5} />
@@ -166,7 +166,7 @@ export default function NovaVenda() {
       }
     >
       {/* pb-24 até lg: espaço para a barra fixa não cobrir o fim do resumo */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-4 pb-24 lg:pb-0 lg:h-[calc(100vh-56px-32px)] lg:min-h-[560px] max-w-[1280px] mx-auto">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-4 pb-24 lg:pb-0 lg:h-full lg:min-h-[560px] max-w-[1280px] mx-auto">
         {/* ---- COLUNA ESQUERDA: cliente + itens ---- */}
         <div className="flex flex-col gap-4 min-h-0">
           {/* Cliente */}

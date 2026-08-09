@@ -89,7 +89,7 @@ export default function Fiados() {
 
   return (
     <LayoutApp titulo="Fiados">
-      <div className="flex flex-col gap-4 h-[calc(100vh-56px-32px)] min-h-[500px]">
+      <div className="flex flex-col gap-4 h-full min-h-[500px]">
         {/* KPIs */}
         <div className="grid grid-cols-2 gap-3 shrink-0 max-w-[560px]">
           <KpiF Icone={Wallet} rotulo="Total a receber" valor={moeda(totalReceber)} destaque />

@@ -73,7 +73,7 @@ export default function UsuarioDetalhe() {
     >
       {/* A altura travada só vale a partir de lg — no mobile as colunas
           empilham e precisam crescer com o conteúdo, senão ele vaza. */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4 lg:h-[calc(100vh-56px-32px)] lg:min-h-[500px]">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4 lg:h-full lg:min-h-[500px]">
         {/* ---- coluna principal ---- */}
         <div className="flex flex-col gap-4 min-w-0">
           {/* cabeçalho */}

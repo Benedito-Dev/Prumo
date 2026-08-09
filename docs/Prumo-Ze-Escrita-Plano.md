@@ -44,19 +44,28 @@
 
 ## 🎯 Sumário executivo
 
-**O que é.** Dar ao Zé 12 tools de escrita, hoje inexistentes — o catálogo em `BackEnd/src/assistente/tools.js` tem 7 entradas e **todas são SELECT** (o próprio arquivo declara isso na linha 7: *"Todas são SOMENTE LEITURA"*). Passa a ser possível dizer *"cadastra cimento CP-II a 42 reais o saco"*, *"o Marcos pagou 200 do fiado"* ou *"vende 10 sacos de cimento pro João no fiado"* e ver acontecer.
+**O que é.** Dar ao Zé **11 tools de escrita**, hoje inexistentes — o catálogo em `BackEnd/src/assistente/tools.js` tem 7 entradas e **todas são SELECT** (o próprio arquivo declara isso na linha 7: *"Todas são SOMENTE LEITURA"*). Passa a ser possível dizer *"cadastra cimento CP-II a 42 reais o saco"*, *"o Marcos pagou 200 do fiado"* ou *"vende 10 sacos de cimento pro João no fiado"* e ver acontecer.
 
-**Quanto custa.** **20 a 27 horas** de trabalho, em 7 fatias verticais entregáveis. A maior parte não é a IA: é a **extração da lógica de negócio dos controllers**, que hoje é impossível de reusar (detalhe em [Arquitetura proposta](#️-arquitetura-proposta)).
+**Quanto custa.** **26 horas** de trabalho, em 7 fatias verticais entregáveis. A maior parte não é a IA: é a **extração da lógica de negócio dos controllers**, que hoje é impossível de reusar (detalhe em [Arquitetura proposta](#️-arquitetura-proposta)).
+
+> ✅ **Decisões tomadas em 09/08/2026** — as duas questões que estavam em aberto foram resolvidas pelo dono do produto:
+>
+> | Questão | Decisão |
+> |---|---|
+> | `criar_venda` confirma? | **Sim.** A confirmação é a nota da venda montada. Fatia 6 mantém 6h; total 26h |
+> | Deletar produto/cliente? | **Produto desativa** (`ativo = FALSE`, nunca DELETE). **Cliente não é deletável pelo Zé** — caminho B, 11 tools |
+>
+> A `OPENROUTER_API_KEY` fica por conta do dono no fim (só a Fatia 7 depende dela).
 
 **Os três riscos principais.**
 
 | | Risco | Gravidade |
 |:---:|---|:---:|
-| 💣 | **`criar_venda` sem confirmação prévia grava dinheiro no banco a partir de uma interpretação de linguagem natural.** Uma venda errada só se desfaz cancelando — e cancelamento é auditável, ou seja, o erro fica registrado para sempre | 🔴 Alta |
+| 💣 | ~~**`criar_venda` sem confirmação prévia grava dinheiro no banco a partir de uma interpretação de linguagem natural.**~~ **Mitigado pela decisão de 09/08:** `criar_venda` confirma. O risco residual é o modelo montar a nota errada — mas aí a pessoa lê antes de gravar | 🟢 Baixa |
 | 🎭 | **Confirmação forjável pelo front.** Se o token de confirmação for só um JSON que volta, qualquer um com o access token executa a operação que quiser sem a IA ter proposto nada | 🔴 Alta |
-| 🗑️ | **`DELETE` real em cliente/produto destrói dados que o histórico ainda precisa** — e o esquema deixa isso passar em alguns casos | 🟡 Média |
+| 🗑️ | ~~**`DELETE` real em cliente/produto destrói dados que o histórico ainda precisa**~~ **Eliminado pela decisão de 09/08:** nenhuma tool faz `DELETE`. Produto desativa; cliente não é deletável pelo Zé | 🟢 Nulo |
 
-**A recomendação de uma linha:** implementar tudo, **exceto** que `criar_venda` também confirma. O argumento está na próxima seção.
+**Estado:** as duas decisões em aberto foram resolvidas (ver quadro acima). **O plano está pronto para execução, começando pela Fatia 1.**
 
 ---
 
@@ -91,6 +100,8 @@ Concordo integralmente para **produtos e clientes**. Criar um produto errado cus
 >
 > Isso não é atrito: é **a mesma leitura de conferência** que a Decisão 2 já quer para criar/editar — só que ANTES de gravar, porque aqui gravar é caro. Custa um toque a mais e elimina o pior risco do plano inteiro. **Se você discordar, o desenho abaixo suporta as duas opções trocando um campo `confirma: true/false` no catálogo** — a implementação não muda.
 
+> ✅ **DECIDIDO (09/08/2026) — `criar_venda` CONFIRMA.** O dono do produto acatou a contraproposta. A confirmação é a nota da venda montada, no formato acima. No catálogo, `criar_venda` fica com `confirma: true`, e a Fatia 6 mantém as 6h estimadas. **Total do plano: 26h.**
+
 ### ✅ Decisão 2 — "Registro" pós-execução com campos não mencionados: **concordo, e é a melhor ideia do pedido**
 
 Não tenho ressalva. É superior a confirmação prévia para operações baratas, por um motivo que vale registrar: **confirmação prévia mostra o que a IA entendeu; registro pós-execução mostra o que o banco tem.** São coisas diferentes. Um `INSERT` pode aplicar defaults, truncar (`VARCHAR(120)` em `produto.nome`, schema linha 63), ou normalizar. O registro captura tudo isso.
@@ -114,6 +125,13 @@ Detalhe de edição: `atualizarProduto` (`produto.controller.js:100-107`) e `atu
 > 📌 **Minha recomendação: caminho B para a primeira entrega, caminho A depois** — como um trabalho próprio, fora deste plano. Motivo: o caminho C entrega ao usuário leigo um comando cujo resultado ele não consegue prever, e o caminho A infla este plano com uma migração de schema que nada tem a ver com IA. E há um argumento de produto: **num depósito, cliente não se apaga.** O sujeito some por dois anos e volta. Cliente duplicado se resolve fundindo, não deletando — e fundir não está no escopo de ninguém hoje.
 >
 > Se você quiser cliente deletável já na v1, escolha **A** e some ~1h30 à estimativa. **Não escolha C.**
+
+> ✅ **DECIDIDO (09/08/2026) — segue a recomendação: produto desativa, cliente não é deletável pelo Zé (caminho B).**
+>
+> - **Produto:** a tool `desativar_produto` faz `UPDATE produto SET ativo = FALSE`. **Nunca DELETE.**
+> - **Cliente:** **não existe** tool de deletar cliente na v1. Perguntado, o Zé responde que isso se faz pela tela de Clientes. O catálogo fica com **11 tools**, não 12.
+> - O caminho A (migração para adicionar `ativo` em `cliente`) fica para um trabalho próprio, fora deste plano, se a necessidade aparecer.
+> - **Caminho C descartado** — comportamento imprevisível para usuário leigo.
 
 **Venda:** já é soft delete e está correto (`venda.controller.js:188-191`). Nada muda.
 

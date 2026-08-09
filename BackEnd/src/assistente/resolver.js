@@ -50,8 +50,26 @@ export function resolverUm(candidatos, termo, rotuloEntidade, rotularOpcao) {
       erro:
         `Achei ${candidatos.length} ${rotuloEntidade}s com "${termo}"` +
         (sobra > 0 ? ` (mostrando ${MAX_OPCOES})` : '') +
-        '. Pergunte qual antes de continuar e chame de novo usando o id da opção escolhida.',
+        '. Liste as opções e pergunte qual é. Quando a pessoa escolher, chame de novo ' +
+        'passando no campo "id" o valor do campo "id" da opção — NUNCA o número da lista.',
       precisa_escolher: mostrados.map((c) => ({ id: c.id, rotulo: rotularOpcao(c) })),
+    },
+  };
+}
+
+// O id do banco é UUID. O modelo às vezes manda o NÚMERO da opção que
+// ele mesmo listou na tela ("1", "2") — e aí o SQL estoura com 22P02 e
+// a pessoa lê "não consegui agora", sem entender nada. Aqui isso vira
+// uma instrução clara de volta para o modelo.
+const PARECE_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function idInvalido(rotuloEntidade) {
+  return {
+    falha: {
+      ok: false,
+      erro:
+        `Esse não é um id de ${rotuloEntidade}. Não use o número da lista — ` +
+        `use o campo "id" que veio junto com a opção escolhida, ou repita a busca pelo nome.`,
     },
   };
 }
@@ -59,6 +77,7 @@ export function resolverUm(candidatos, termo, rotuloEntidade, rotularOpcao) {
 // Acha UM produto por id (2º turno) ou por nome (1º turno).
 // O id tem prioridade: quando ele vem, a pessoa já escolheu.
 export async function resolverProduto({ id, busca }) {
+  if (id && !PARECE_UUID.test(id)) return idInvalido('produto');
   if (id) {
     const produto = await buscarProduto(id);
     if (!produto) {
@@ -76,6 +95,7 @@ export async function resolverProduto({ id, busca }) {
 }
 
 export async function resolverCliente({ id, busca }) {
+  if (id && !PARECE_UUID.test(id)) return idInvalido('cliente');
   if (id) {
     const cliente = await buscarCliente(id);
     if (!cliente) {

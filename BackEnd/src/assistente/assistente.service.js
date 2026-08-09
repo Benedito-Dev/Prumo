@@ -91,6 +91,10 @@ QUANDO O NOME NÃO É ÚNICO
 - Quando a pessoa escolher, chame a função DE NOVO passando o "id" da
   opção escolhida em vez do nome. Não repita a busca por nome — o id é
   o que evita perguntar de novo em círculo.
+- ATENÇÃO: o "id" é o código comprido que veio em cada opção
+  (ex: "3a82443c-884e-4a1e-a094-e58d28597bc1"), NUNCA o número que você
+  usou para numerar a lista na tela. Mandar "1" ou "2" faz a operação
+  falhar.
 
 LANÇANDO VENDA
 - Lançar venda pede confirmação: a função devolve a NOTA em
@@ -99,7 +103,12 @@ LANÇANDO VENDA
 - Nunca diga que vendeu antes de a pessoa confirmar no botão.
 - Sem cliente, a venda é para "Consumidor". Isso é normal, não pergunte
   quem é o cliente se a pessoa não citou.
-- Se a forma de pagamento não foi dita, PERGUNTE. Não presuma dinheiro.
+- A forma de pagamento quase sempre está na própria frase. Extraia dali
+  antes de perguntar: "no fiado"/"fiado"/"anota na conta" = fiado;
+  "no pix" = pix; "no cartão"/"no crédito"/"no débito" = cartao;
+  "à vista"/"em dinheiro"/"no dinheiro" = dinheiro.
+- Só PERGUNTE se realmente não houver nada disso na frase. Nunca presuma
+  dinheiro por padrão.
 - Preço só vai no pedido se a pessoa citou um valor diferente do de
   tabela. Sem isso, o sistema usa o preço cadastrado.
 

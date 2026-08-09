@@ -644,6 +644,16 @@ async function suite() {
   const semNada = await tool('editar_produto', { preco_venda: 1 });
   ok(semNada.ok === false, 'sem busca e sem id é recusado');
 
+  // Achado na Fatia 7, com o modelo real: ele mandou id "1" — o número
+  // da opção que ele mesmo tinha listado. Estourava 22P02 no SQL e a
+  // pessoa lia "não consegui agora", sem entender nada.
+  const idNumerico = await tool('editar_produto', { id: '1', preco_venda: 1 });
+  ok(idNumerico.ok === false && /número da lista/.test(idNumerico.erro),
+    'id numérico vira instrução clara, não erro de SQL', idNumerico.erro);
+  const idNumericoCli = await tool('editar_cliente', { id: '2', tipo: 'pedreiro' });
+  ok(idNumericoCli.ok === false && /número da lista/.test(idNumericoCli.erro),
+    'o mesmo vale para cliente');
+
   // O mesmo vale para cliente, inclusive na tool de fiado.
   const homonimoA = await clientes.criarCliente({
     nome: `Irmao Um ${marca}`, telefone: '11955550001',

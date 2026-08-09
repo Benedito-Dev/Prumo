@@ -39,6 +39,11 @@ services:
       ADMIN_NOME: Benedito
       ADMIN_EMAIL: beneditobittencourtt@gmail.com
       ADMIN_SENHA: prumo123
+      # Chave do assistente (Zé). Vem do arquivo .env da raiz, que NÃO
+      # entra no Git — segredo não mora em arquivo versionado.
+      # Sem ela, /api/assistente responde 503 e o resto segue normal.
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-openai/gpt-4o-mini}
     ports:
       - "3000:3000"
     volumes:

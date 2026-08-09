@@ -19,7 +19,7 @@ const NAV = [
   { para: '/fiados', rotulo: 'Fiados', Icone: NotebookPen },
   { para: '/clientes', rotulo: 'Clientes', Icone: Users },
   { para: '/produtos', rotulo: 'Produtos', Icone: Package },
-  { para: '/assistente', rotulo: 'Assistente', Icone: Sparkles },
+  { para: '/assistente', rotulo: 'Zé', Icone: Sparkles },
 ];
 
 export default function LayoutApp({ titulo, periodo, acao, children }) {

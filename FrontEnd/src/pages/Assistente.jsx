@@ -58,7 +58,7 @@ export default function Assistente() {
           texto:
             e.message === 'Sessão expirada'
               ? 'Sua sessão expirou. Entre novamente para continuar.'
-              : 'Não consegui responder agora. O assistente pode estar indisponível — tente de novo em instantes.',
+              : 'O Zé não conseguiu responder agora. Tente de novo em instantes.',
         },
       ]);
     } finally {
@@ -80,7 +80,7 @@ export default function Assistente() {
 
   return (
     <LayoutApp
-      titulo="Assistente"
+      titulo="Zé"
       acao={
         !vazio && (
           <button
@@ -173,8 +173,8 @@ export default function Assistente() {
             </p>
           ) : (
             <p className="text-[11px] text-grafite-medio mt-1.5 px-1">
-              O assistente responde com base nos seus dados. Confira os números
-              na tela correspondente antes de decidir.
+              O Zé responde com base nos seus dados. Confira os números na tela
+              correspondente antes de decidir.
             </p>
           )}
         </div>
@@ -191,7 +191,7 @@ function BoasVindas({ nome, onEscolher }) {
         <Sparkles size={26} />
       </span>
       <p className="text-[20px] font-bold">
-        {nome ? `Olá, ${nome}.` : 'Olá.'} O que você quer saber?
+        {nome ? `Olá, ${nome}. Aqui é o Zé.` : 'Olá. Aqui é o Zé.'}
       </p>
       <p className="text-[13.5px] text-grafite-medio mt-1.5 max-w-[420px]">
         Pergunte em português sobre o seu depósito — vendas, clientes, fiados

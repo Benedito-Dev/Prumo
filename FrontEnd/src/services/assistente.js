@@ -1,6 +1,6 @@
-// Assistente de IA — perguntas em linguagem natural sobre o negócio.
-// O back ainda não existe: enquanto /assistente/perguntar não responder,
-// a página cai no aviso de indisponível (ver Assistente.jsx).
+// Zé — o assistente de IA do Prumo. Perguntas em linguagem natural sobre
+// o negócio. A rota e o campo `papel: 'assistente'` seguem com o nome
+// técnico: renomear quebraria links salvos e o contrato com a API.
 import { api } from './api';
 
 export const assistenteService = {

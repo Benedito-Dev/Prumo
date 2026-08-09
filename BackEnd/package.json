@@ -6,7 +6,8 @@
   "main": "src/server.js",
   "scripts": {
     "dev": "node --watch src/server.js",
-    "start": "node src/server.js"
+    "start": "node src/server.js",
+    "test": "node scripts/testar-tools.mjs"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

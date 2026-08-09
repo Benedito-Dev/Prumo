@@ -17,7 +17,8 @@ import {
   contarVendasDoProduto,
   definirAtivoProduto,
 } from '../produto/produto.service.js';
-import { protegido, resolverUnico, moeda, diferencas } from './tools.escrita.comum.js';
+import { protegido, moeda, diferencas } from './tools.escrita.comum.js';
+import { resolverProduto } from './resolver.js';
 
 const FONTE = { rotulo: 'Produtos', para: '/produtos' };
 
@@ -62,17 +63,15 @@ async function resolverCategoria(nomeCategoria) {
   return { id: categoria.id };
 }
 
-// Acha UM produto pelo nome falado. Devolve { falha } quando não achou ou
-// achou vários — e aí nada é gravado.
-async function acharProduto(busca) {
-  const candidatos = await buscarProdutosPorNome(busca);
-  return resolverUnico(
-    candidatos,
-    busca,
-    'produto',
-    (p) => `${p.nome} (${p.unidade}, ${moeda(p.preco_venda)})`
-  );
-}
+// Parâmetro que todas as tools de alteração aceitam: o id fecha o
+// segundo turno da conversa ("o Mizu" → o modelo repete a chamada com o
+// id que veio nas opções). Sem ele, ambiguidade viraria laço.
+const ARG_ID = {
+  type: 'string',
+  description:
+    'Id exato do produto, quando já foi escolhido numa pergunta anterior. ' +
+    'Tendo o id, não mande `busca`.',
+};
 
 export const TOOLS_PRODUTO = {
   criar_produto: {
@@ -150,18 +149,19 @@ export const TOOLS_PRODUTO = {
             type: 'string',
             description: 'Parte do nome do produto a alterar, como o usuário falou.',
           },
+          id: ARG_ID,
           nome: { type: 'string', description: 'Novo nome. Só mande se o usuário pediu para renomear.' },
           unidade: { type: 'string', enum: UNIDADES_VALIDAS, description: 'Nova unidade.' },
           preco_venda: { type: 'number', description: 'Novo preço de venda, em reais.' },
           preco_custo: { type: 'number', description: 'Novo preço de custo, em reais.' },
           categoria: { type: 'string', description: 'Nome de uma categoria que JÁ existe.' },
         },
-        required: ['busca'],
+        required: [],
       },
     },
     async executar(args) {
       return protegido(async () => {
-        const achado = await acharProduto(args.busca);
+        const achado = await resolverProduto(args);
         if (achado.falha) return achado.falha;
         const antes = achado.item;
 
@@ -229,19 +229,16 @@ export const TOOLS_PRODUTO = {
             type: 'string',
             description: 'Nome (ou parte) do produto a desativar.',
           },
+          id: ARG_ID,
         },
-        required: ['busca'],
+        required: [],
       },
     },
 
     // PASSO 1: resolve e descreve, sem gravar nada.
     async preparar(args) {
       return protegido(async () => {
-        const candidatos = await buscarProdutosPorNome(args.busca);
-        const { item, falha } = resolverUnico(
-          candidatos, args.busca, 'produto',
-          (p) => `${p.nome} — ${moeda(p.preco_venda)}`
-        );
+        const { item, falha } = await resolverProduto(args);
         if (falha) return falha;
 
         if (!item.ativo) {
@@ -304,17 +301,14 @@ export const TOOLS_PRODUTO = {
             type: 'string',
             description: 'Nome (ou parte) do produto a reativar.',
           },
+          id: ARG_ID,
         },
-        required: ['busca'],
+        required: [],
       },
     },
     async executar(args) {
       return protegido(async () => {
-        const candidatos = await buscarProdutosPorNome(args.busca);
-        const { item, falha } = resolverUnico(
-          candidatos, args.busca, 'produto',
-          (p) => `${p.nome} — ${moeda(p.preco_venda)}`
-        );
+        const { item, falha } = await resolverProduto(args);
         if (falha) return falha;
 
         if (item.ativo) {

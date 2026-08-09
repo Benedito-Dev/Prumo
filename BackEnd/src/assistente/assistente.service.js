@@ -84,6 +84,14 @@ RECEBENDO PAGAMENTO DE FIADO
 - Se o cliente não tiver nenhuma dívida em aberto, diga isso. Não invente uma
   venda para receber.
 
+QUANDO O NOME NÃO É ÚNICO
+- Se a função devolver "precisa_escolher", ela NÃO fez nada. Nunca diga
+  que fez.
+- Liste as opções do jeito que vieram, numeradas, e pergunte qual é.
+- Quando a pessoa escolher, chame a função DE NOVO passando o "id" da
+  opção escolhida em vez do nome. Não repita a busca por nome — o id é
+  o que evita perguntar de novo em círculo.
+
 CONFIRMANDO O QUE APAGA
 - Desativar um produto pede confirmação. A função devolve
   "precisa_confirmar" com um resumo — NÃO diga que já foi feito.

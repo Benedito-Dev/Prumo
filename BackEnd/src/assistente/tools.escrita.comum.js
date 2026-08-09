@@ -1,9 +1,12 @@
 // Peças compartilhadas pelas tools de escrita (Fatia 2).
 //
-// Existe para que tools.produto.js e tools.cliente.js digam a mesma coisa
-// do mesmo jeito: o mesmo formato de erro, a mesma moeda, a mesma leitura
-// de ambiguidade. Formato divergente entre duas tools vira resposta
+// Existe para que as tools de escrita digam a mesma coisa do mesmo
+// jeito: o mesmo formato de erro, a mesma moeda, a mesma comparação de
+// antes/depois. Formato divergente entre duas tools vira resposta
 // divergente do modelo, e aí quem lê não sabe se conferiu tudo.
+//
+// A resolução de nome ambíguo mora em resolver.js (Fatia 4) — era daqui
+// e saiu para não haver duas regras de desempate no projeto.
 
 import { ErroNegocio } from '../config/erros.js';
 
@@ -19,37 +22,6 @@ export async function protegido(fn, mensagemGenerica) {
     console.error(`[tools] ${mensagemGenerica}:`, erro.message);
     return { ok: false, erro: mensagemGenerica };
   }
-}
-
-// Decide entre "achei um", "não achei" e "achei vários". A tool NUNCA
-// escolhe sozinha: escolha errada grava dado errado em silêncio, e o
-// usuário só descobre depois. Ambiguidade é pergunta.
-//
-// Devolve { item } quando resolveu, ou { falha } pronta para retornar.
-export function resolverUnico(candidatos, termo, rotuloEntidade, rotularOpcao) {
-  if (candidatos.length === 0) {
-    return {
-      falha: {
-        ok: false,
-        erro: `Não achei nenhum ${rotuloEntidade} com "${termo}".`,
-      },
-    };
-  }
-
-  if (candidatos.length === 1) return { item: candidatos[0] };
-
-  // Nome digitado exato desempata: "Marcos" ganha de "Marcos Antônio".
-  const alvo = String(termo).trim().toLowerCase();
-  const exatos = candidatos.filter((c) => String(c.nome).toLowerCase() === alvo);
-  if (exatos.length === 1) return { item: exatos[0] };
-
-  return {
-    falha: {
-      ok: false,
-      erro: `Achei ${candidatos.length} ${rotuloEntidade}s com "${termo}". Pergunte qual antes de continuar.`,
-      precisa_escolher: candidatos.map((c) => ({ id: c.id, rotulo: rotularOpcao(c) })),
-    },
-  };
 }
 
 // R$ 1.234,56 — o mesmo formato que o resto do produto usa.

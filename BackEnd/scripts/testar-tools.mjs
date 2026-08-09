@@ -572,6 +572,101 @@ async function suite() {
   const negado = await tool('desativar_produto', { busca: `Desativavel ${marca}` }, VENDEDOR);
   ok(/permissão/i.test(negado.erro || ''), 'vendedor não desativa produto');
 
+  // ---------------------------------------------------------- Fatia 4
+  console.log('\n🧭 RESOLVEDOR — o segundo turno da conversa');
+
+  // Dois produtos que empatam de propósito, como os dois cimentos reais
+  // do usuário ("Cimento CP-II 50kg" e "Cimento Mizu 50kg").
+  const gemeoA = await produtos.criarProduto({
+    nome: `Massa Fina ${marca}`, unidade: 'saco', preco_venda: 30,
+  });
+  const gemeoB = await produtos.criarProduto({
+    nome: `Massa Grossa ${marca}`, unidade: 'saco', preco_venda: 40,
+  });
+  criados.produtos.push(gemeoA.id, gemeoB.id);
+
+  // 1º turno: nome ambíguo. Não grava e devolve as opções COM id.
+  const ambiguo = await tool('editar_produto', { busca: `Massa`, preco_venda: 99 });
+  ok(ambiguo.ok === false, 'ambíguo não grava');
+  ok(Array.isArray(ambiguo.precisa_escolher), 'devolve as opções');
+  ok(ambiguo.precisa_escolher.every((o) => o.id && o.rotulo), 'cada opção tem id e rótulo');
+  ok(/R\$/.test(ambiguo.precisa_escolher[0].rotulo),
+    'o rótulo mostra o preço — é o que distingue um do outro');
+  ok(Number((await produtos.buscarProduto(gemeoA.id)).preco_venda) === 30,
+    'nada foi alterado no 1º turno');
+
+  // 2º turno: a pessoa escolheu, o modelo repete a chamada com o id.
+  // ESTE é o teste da fatia: sem ele, o Zé perguntaria em laço.
+  const escolhido = ambiguo.precisa_escolher.find((o) => o.rotulo.includes('Grossa'));
+  const resolvido = await tool('editar_produto', { id: escolhido.id, preco_venda: 99 });
+  ok(resolvido.ok === true, '2º turno com id funciona');
+  ok(Number((await produtos.buscarProduto(gemeoB.id)).preco_venda) === 99,
+    'alterou o produto ESCOLHIDO');
+  ok(Number((await produtos.buscarProduto(gemeoA.id)).preco_venda) === 30,
+    'não encostou no outro');
+
+  // Desempate por nome exato: o nome completo ganha do parcial.
+  const exato = await tool('editar_produto', {
+    busca: `Massa Fina ${marca}`, preco_custo: 12,
+  });
+  ok(exato.ok === true, 'nome exato desempata sem perguntar');
+
+  // Teto de opções: com muitos candidatos, o Zé não despeja a lista toda.
+  const muitos = [];
+  for (let i = 0; i < 7; i++) {
+    const x = await produtos.criarProduto({
+      nome: `Lote ${marca} n${i}`, unidade: 'peca', preco_venda: 5 + i,
+    });
+    criados.produtos.push(x.id);
+    muitos.push(x.id);
+  }
+  const demais = await tool('editar_produto', { busca: `Lote ${marca}`, preco_venda: 1 });
+  ok(demais.precisa_escolher.length === 5, 'mostra no máximo 5 opções',
+    `mostrou ${demais.precisa_escolher?.length}`);
+  ok(/7 produtos/.test(demais.erro), 'mas diz quantos existem de verdade');
+
+  // Id que não existe mais: erro claro, não estouro.
+  const sumido = await tool('editar_produto', {
+    id: '00000000-0000-0000-0000-000000000000', preco_venda: 1,
+  });
+  ok(sumido.ok === false && /não existe mais/.test(sumido.erro),
+    'id inexistente avisa em português');
+
+  // Sem busca e sem id.
+  const semNada = await tool('editar_produto', { preco_venda: 1 });
+  ok(semNada.ok === false, 'sem busca e sem id é recusado');
+
+  // O mesmo vale para cliente, inclusive na tool de fiado.
+  const homonimoA = await clientes.criarCliente({
+    nome: `Irmao Um ${marca}`, telefone: '11955550001',
+  });
+  const homonimoB = await clientes.criarCliente({
+    nome: `Irmao Dois ${marca}`, telefone: '11955550002',
+  });
+  criados.clientes.push(homonimoA.id, homonimoB.id);
+
+  const cliAmbiguo = await tool('editar_cliente', { busca: `Irmao`, tipo: 'pedreiro' });
+  ok(cliAmbiguo.ok === false && cliAmbiguo.precisa_escolher?.length === 2,
+    'cliente ambíguo devolve as duas opções');
+  ok(/1195555000/.test(cliAmbiguo.precisa_escolher[0].rotulo),
+    'o rótulo do cliente mostra o telefone');
+
+  const cliResolvido = await tool('editar_cliente', {
+    id: homonimoB.id, tipo: 'construtora',
+  });
+  ok(cliResolvido.ok === true, 'cliente: 2º turno com id funciona');
+  ok((await clientes.buscarCliente(homonimoB.id)).tipo === 'construtora',
+    'alterou o cliente escolhido');
+  ok((await clientes.buscarCliente(homonimoA.id)).tipo === null,
+    'não encostou no outro cliente');
+
+  // A tool de fiado usa o MESMO resolvedor — mesma leitura, mesmo formato.
+  const fiadoAmbiguo = await tool('registrar_pagamento_fiado', {
+    cliente: `Irmao`, valor: 10,
+  });
+  ok(Array.isArray(fiadoAmbiguo.precisa_escolher),
+    'fiado usa o mesmo resolvedor e devolve precisa_escolher');
+
   // Limpeza — nada de lixo de teste no banco do usuário.
   console.log('\n🧹 LIMPEZA');
   for (const id of criados.produtos) await produtos.removerProduto(id);

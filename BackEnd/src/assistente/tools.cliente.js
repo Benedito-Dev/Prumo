@@ -12,7 +12,8 @@ import {
   atualizarClienteParcial,
   buscarClientesPorNome,
 } from '../cliente/cliente.service.js';
-import { protegido, resolverUnico, diferencas } from './tools.escrita.comum.js';
+import { protegido, diferencas } from './tools.escrita.comum.js';
+import { resolverCliente } from './resolver.js';
 
 const FONTE = { rotulo: 'Clientes', para: '/clientes' };
 
@@ -34,10 +35,14 @@ function resumirCliente(c) {
   ].join(' · ');
 }
 
-async function acharCliente(busca) {
-  const candidatos = await buscarClientesPorNome(busca);
-  return resolverUnico(candidatos, busca, 'cliente', (c) => `${c.nome} (${c.telefone})`);
-}
+// Fecha o segundo turno da conversa: "o Silva" → o modelo repete a
+// chamada com o id que veio nas opções.
+const ARG_ID = {
+  type: 'string',
+  description:
+    'Id exato do cliente, quando já foi escolhido numa pergunta anterior. ' +
+    'Tendo o id, não mande `busca`.',
+};
 
 export const TOOLS_CLIENTE = {
   criar_cliente: {
@@ -98,17 +103,18 @@ export const TOOLS_CLIENTE = {
         type: 'object',
         properties: {
           busca: { type: 'string', description: 'Parte do nome do cliente, como o usuário falou.' },
+          id: ARG_ID,
           nome: { type: 'string', description: 'Novo nome. Só mande se o usuário pediu para renomear.' },
           telefone: { type: 'string', description: 'Novo telefone.' },
           tipo: { type: 'string', enum: TIPOS_VALIDOS, description: 'Novo tipo de comprador.' },
           observacao: { type: 'string', description: 'Nova anotação. Substitui a anterior.' },
         },
-        required: ['busca'],
+        required: [],
       },
     },
     async executar(args) {
       return protegido(async () => {
-        const achado = await acharCliente(args.busca);
+        const achado = await resolverCliente(args);
         if (achado.falha) return achado.falha;
         const antes = achado.item;
 

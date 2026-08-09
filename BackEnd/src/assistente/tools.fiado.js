@@ -6,7 +6,7 @@
 // detalhado do retorno: o modelo tem que dizer em qual venda o dinheiro
 // entrou e quanto ainda resta.
 import * as fiados from '../fiado/fiado.service.js';
-import { buscarClientesPorNome } from '../cliente/cliente.service.js';
+import { resolverCliente } from './resolver.js';
 import { ErroNegocio } from '../config/erros.js';
 
 const reais = (n) => `R$ ${Number(n).toFixed(2).replace('.', ',')}`;
@@ -24,28 +24,13 @@ function comoErro(erro) {
 // Seção 4 do contrato: 1 resultado segue, 0 ou 2+ devolvem erro.
 // Ambiguidade é pergunta, não chute — errar aqui credita dinheiro na
 // conta do cliente errado, em silêncio.
-async function resolverCliente(nome) {
-  const termo = String(nome ?? '').trim();
-  if (!termo) return { erro: { ok: false, erro: 'Informe de qual cliente é o pagamento.' } };
-
-  const achados = await buscarClientesPorNome(termo);
-
-  if (achados.length === 0) {
-    return { erro: { ok: false, erro: `Não achei nenhum cliente com "${termo}".` } };
-  }
-  if (achados.length > 1) {
-    return {
-      erro: {
-        ok: false,
-        erro: `Achei ${achados.length} clientes com "${termo}". Qual deles?`,
-        precisa_escolher: achados.map((c) => ({
-          id: c.id,
-          rotulo: c.telefone ? `${c.nome} (${c.telefone})` : c.nome,
-        })),
-      },
-    };
-  }
-  return { cliente: achados[0] };
+// Delega ao resolvedor compartilhado (Fatia 4): mesma regra de
+// desempate e mesmo formato de `precisa_escolher` que as outras tools —
+// duas leituras diferentes da mesma ambiguidade confundiriam quem lê.
+async function acharCliente({ cliente, cliente_id }) {
+  const { item, falha } = await resolverCliente({ id: cliente_id, busca: cliente });
+  if (falha) return { erro: falha };
+  return { cliente: item };
 }
 
 // Frase pronta para o modelo transcrever. Discriminar venda por venda é
@@ -81,6 +66,12 @@ export const TOOLS_FIADO = {
             type: 'string',
             description: 'Nome (ou parte do nome) do cliente que está pagando.',
           },
+          cliente_id: {
+            type: 'string',
+            description:
+              'Id exato do cliente, quando já foi escolhido numa pergunta anterior. ' +
+              'Tendo o id, não mande `cliente`.',
+          },
           valor: {
             type: 'number',
             description: 'Valor recebido, em reais.',
@@ -91,13 +82,13 @@ export const TOOLS_FIADO = {
               'Opcional. Só quando a pessoa disser explicitamente qual dívida está pagando. Sem isso, o pagamento entra em cascata da dívida mais antiga para a mais nova.',
           },
         },
-        required: ['cliente', 'valor'],
+        required: ['valor'],
       },
     },
 
-    async executar({ cliente, valor, venda_id }, usuario) {
+    async executar({ cliente, cliente_id, valor, venda_id }, usuario) {
       try {
-        const { cliente: encontrado, erro } = await resolverCliente(cliente);
+        const { cliente: encontrado, erro } = await acharCliente({ cliente, cliente_id });
         if (erro) return erro;
 
         // Caminho por venda: só quando a pessoa apontou a dívida. Ainda

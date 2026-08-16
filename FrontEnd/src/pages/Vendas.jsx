@@ -4,6 +4,7 @@ import { Plus, Receipt, X, Ban, Search } from 'lucide-react';
 import LayoutApp from '../components/LayoutApp';
 import Seletor from '../components/Seletor';
 import { vendasService } from '../services/vendas';
+import { useAuth } from '../auth/AuthContext';
 import { moeda, numero } from '../utils/formato';
 
 const FORMAS = {
@@ -53,6 +54,8 @@ function rangePeriodo(periodo) {
 
 export default function Vendas() {
   const navigate = useNavigate();
+  const { usuario } = useAuth();
+  const ehDono = usuario?.papel === 'dono';
   const [vendas, setVendas] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [periodo, setPeriodo] = useState('mes');
@@ -94,7 +97,9 @@ export default function Vendas() {
 
   return (
     <LayoutApp
-      titulo="Vendas"
+      // O back já devolve ao vendedor só as vendas dele; o título diz isso
+      // na tela, senão ele acha que a loja vendeu pouco.
+      titulo={ehDono ? 'Vendas' : 'Minhas vendas'}
       acao={
         <button
           onClick={() => navigate('/vendas/nova')}

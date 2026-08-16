@@ -233,6 +233,10 @@ export const openapiSpec = {
       post: {
         tags: ['Auth'],
         summary: 'Login (bcrypt) — retorna access token e seta refresh (cookie httpOnly)',
+        description:
+          'Limitado a 10 tentativas malsucedidas por IP a cada 15 minutos. ' +
+          'Login bem-sucedido não consome a cota — vários vendedores no mesmo ' +
+          'IP da loja não esgotam o limite trabalhando.',
         requestBody: {
           required: true,
           content: {
@@ -258,6 +262,7 @@ export const openapiSpec = {
           }, 'Autenticado'),
           401: erro('Login ou senha inválidos'),
           403: erro('Usuário inativo'),
+          429: erro('Muitas tentativas de login'),
         },
       },
     },
@@ -313,7 +318,8 @@ export const openapiSpec = {
         tags: ['Clientes'],
         summary: 'Clientes com estatísticas de compra (total, nº compras, última compra)',
         description:
-          'LEFT JOIN com vendas concluídas. dias_sem_comprar ajuda a identificar clientes sumidos (RF24).',
+          'LEFT JOIN com vendas concluídas. dias_sem_comprar ajuda a identificar clientes sumidos (RF24). ' +
+          SO_DONO,
         responses: {
           200: ok({
             type: 'array',
@@ -332,6 +338,7 @@ export const openapiSpec = {
               ],
             },
           }),
+          403: erro('Só o dono'),
         },
       },
     },
@@ -339,6 +346,11 @@ export const openapiSpec = {
       get: {
         tags: ['Clientes'],
         summary: 'Lista clientes (com busca opcional)',
+        description:
+          'O dono recebe a lista completa. O vendedor recebe apenas o resultado de uma ' +
+          'busca (mínimo 2 caracteres, no máximo 8 resultados) — sem `busca` vem vazio. ' +
+          'Ele precisa achar cliente para lançar venda, mas a carteira da loja não é ' +
+          'ferramenta de balcão.',
         parameters: [
           {
             name: 'busca',
@@ -372,6 +384,7 @@ export const openapiSpec = {
       put: {
         tags: ['Clientes'],
         summary: 'Atualiza um cliente',
+        description: SO_DONO + ' O vendedor cadastra cliente novo, mas não edita o que existe.',
         parameters: [paramId],
         requestBody: {
           required: true,
@@ -380,15 +393,18 @@ export const openapiSpec = {
         responses: {
           200: ok(ref('Cliente'), 'Atualizado'),
           400: erro('Dados inválidos'),
+          403: erro('Só o dono'),
           404: erro('Não encontrado'),
         },
       },
       delete: {
         tags: ['Clientes'],
         summary: 'Remove um cliente',
+        description: SO_DONO,
         parameters: [paramId],
         responses: {
           204: { description: 'Removido' },
+          403: erro('Só o dono'),
           404: erro('Não encontrado'),
           409: erro('Cliente possui vendas'),
         },
@@ -645,6 +661,9 @@ export const openapiSpec = {
       get: {
         tags: ['Vendas'],
         summary: 'Lista vendas (filtros de período, status e cliente)',
+        description:
+          'O dono vê a loja inteira; o vendedor recebe apenas as vendas que ele mesmo ' +
+          'lançou. O recorte vem do token e sobrescreve o que vier na query.',
         parameters: [
           { name: 'de', in: 'query', schema: { type: 'string', format: 'date' } },
           { name: 'ate', in: 'query', schema: { type: 'string', format: 'date' } },
@@ -707,11 +726,79 @@ export const openapiSpec = {
     },
 
     // ---------------- FIADOS ----------------
+    // As duas rotas `/fiados/cliente/*` são a dívida de UM cliente e ficam
+    // abertas ao balcão (alimentam o aviso no meio da venda). O mapa de
+    // todos os devedores é restrito ao dono.
+    '/fiados/cliente/{clienteId}': {
+      get: {
+        tags: ['Fiados'],
+        summary: 'Dívida em aberto de UM cliente',
+        description:
+          'Aberta a qualquer autenticado. Alimenta o aviso que aparece ao escolher o ' +
+          'cliente em Nova Venda ("este cliente tem R$ X em aberto"). Saber da conta de ' +
+          'quem está sendo atendido é atendimento; a lista de todos os devedores (GET ' +
+          '/fiados) continua restrita ao dono.',
+        parameters: [
+          { name: 'clienteId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+        ],
+        responses: {
+          200: ok({
+            type: 'object',
+            properties: {
+              total: { type: 'number', description: 'soma dos saldos em aberto' },
+              qtd_dividas: { type: 'integer' },
+              mais_antiga: { type: 'string', format: 'date-time', nullable: true },
+            },
+          }),
+        },
+      },
+    },
+    '/fiados/cliente/{clienteId}/pagar': {
+      post: {
+        tags: ['Fiados'],
+        summary: 'Recebe pagamento abatendo em cascata (mais antiga primeiro)',
+        description:
+          'Aberta a qualquer autenticado — é o botão "abater" do aviso na venda. ' +
+          'Numa transação só; valor maior que o total devido é recusado antes do ' +
+          'primeiro INSERT (não existe crédito).',
+        parameters: [
+          { name: 'clienteId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['valor'],
+                properties: { valor: { type: 'number', example: 150.0 } },
+              },
+            },
+          },
+        },
+        responses: {
+          201: ok({
+            type: 'object',
+            properties: {
+              recebido: { type: 'number' },
+              total_devido_antes: { type: 'number' },
+              total_devido_depois: { type: 'number' },
+              dividas_quitadas: { type: 'integer' },
+              quitou_tudo: { type: 'boolean' },
+              abatimentos: { type: 'array', items: { type: 'object' } },
+            },
+          }, 'Pagamento registrado'),
+          400: erro('Valor inválido ou maior que o total devido'),
+        },
+      },
+    },
     '/fiados': {
       get: {
         tags: ['Fiados'],
         summary: 'Vendas fiado em aberto (com saldo devedor)',
-        description: 'Só vendas concluídas com forma_pagamento=fiado e saldo > 0. Mais antigas primeiro.',
+        description:
+          'Só vendas concluídas com forma_pagamento=fiado e saldo > 0. Mais antigas primeiro. ' +
+          SO_DONO,
         responses: {
           200: ok({
             type: 'array',
@@ -730,6 +817,7 @@ export const openapiSpec = {
               },
             },
           }),
+          403: erro('Só o dono'),
         },
       },
     },
@@ -737,6 +825,7 @@ export const openapiSpec = {
       get: {
         tags: ['Fiados'],
         summary: 'Total a receber e nº de dívidas em aberto',
+        description: SO_DONO,
         responses: {
           200: ok({
             type: 'object',
@@ -745,6 +834,7 @@ export const openapiSpec = {
               qtd: { type: 'integer' },
             },
           }),
+          403: erro('Só o dono'),
         },
       },
     },
@@ -752,6 +842,7 @@ export const openapiSpec = {
       get: {
         tags: ['Fiados'],
         summary: 'Histórico de quitações de uma venda fiado',
+        description: SO_DONO,
         parameters: [
           { name: 'vendaId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
         ],
@@ -768,6 +859,7 @@ export const openapiSpec = {
               },
             },
           }),
+          403: erro('Só o dono'),
         },
       },
     },
@@ -775,6 +867,8 @@ export const openapiSpec = {
       post: {
         tags: ['Fiados'],
         summary: 'Registra um pagamento (parcial ou total) de um fiado',
+        description:
+          SO_DONO + ' O vendedor recebe fiado por /fiados/cliente/{clienteId}/pagar.',
         parameters: [
           { name: 'vendaId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
         ],
@@ -806,10 +900,52 @@ export const openapiSpec = {
     },
 
     // ---------------- PAINEL ----------------
+    // Os indicadores da loja (faturamento, ranking de clientes, desempenho
+    // por vendedor) são restritos ao dono. As duas rotas "meu-*" no fim da
+    // seção são as únicas abertas ao vendedor: filtram pelo id do token.
+    '/painel/meu-resumo': {
+      get: {
+        tags: ['Painel'],
+        summary: 'Total, nº de vendas e ticket médio DO PRÓPRIO usuário',
+        description:
+          'Aberta a qualquer autenticado. O filtro vem do token (req.usuario.id), ' +
+          'nunca da query — um vendedor não alcança os números de outro.',
+        parameters: [
+          {
+            name: 'periodo',
+            in: 'query',
+            schema: { type: 'string', enum: ['hoje', 'semana', 'mes', 'ano'] },
+          },
+          { name: 'de', in: 'query', schema: { type: 'string', format: 'date' } },
+          { name: 'ate', in: 'query', schema: { type: 'string', format: 'date' } },
+        ],
+        responses: {
+          200: ok({
+            type: 'object',
+            properties: {
+              periodo: { type: 'object' },
+              total: { type: 'number' },
+              qtd_vendas: { type: 'number' },
+              ticket_medio: { type: 'number' },
+            },
+          }),
+        },
+      },
+    },
+    '/painel/minha-evolucao': {
+      get: {
+        tags: ['Painel'],
+        summary: 'Faturamento diário do próprio usuário, para gráfico',
+        description: 'Aberta a qualquer autenticado. Filtra pelo id do token.',
+        parameters: [{ name: 'periodo', in: 'query', schema: { type: 'string' } }],
+        responses: { 200: ok({ type: 'array', items: { type: 'object' } }) },
+      },
+    },
     '/painel/faturamento': {
       get: {
         tags: ['Painel'],
         summary: 'Faturamento do mês x anterior (RF16)',
+        description: SO_DONO,
         responses: {
           200: ok({
             type: 'object',
@@ -820,6 +956,7 @@ export const openapiSpec = {
               vendas_mes_atual: { type: 'number' },
             },
           }),
+          403: erro('Só o dono'),
         },
       },
     },
@@ -827,6 +964,7 @@ export const openapiSpec = {
       get: {
         tags: ['Painel'],
         summary: 'Total, nº de vendas, ticket médio e variação vs. período anterior (RF18)',
+        description: SO_DONO,
         parameters: [
           {
             name: 'periodo',
@@ -856,6 +994,7 @@ export const openapiSpec = {
               },
             },
           }),
+          403: erro('Só o dono'),
         },
       },
     },
@@ -863,38 +1002,54 @@ export const openapiSpec = {
       get: {
         tags: ['Painel'],
         summary: 'Ranking de clientes (RF17)',
+        description: SO_DONO,
         parameters: [
           { name: 'periodo', in: 'query', schema: { type: 'string' } },
           { name: 'limite', in: 'query', schema: { type: 'integer' } },
         ],
-        responses: { 200: ok({ type: 'array', items: { type: 'object' } }) },
+        responses: {
+          200: ok({ type: 'array', items: { type: 'object' } }),
+          403: erro('Só o dono'),
+        },
       },
     },
     '/painel/produtos-mais-vendidos': {
       get: {
         tags: ['Painel'],
         summary: 'Produtos mais vendidos (RF19)',
+        description: SO_DONO,
         parameters: [
           { name: 'periodo', in: 'query', schema: { type: 'string' } },
           { name: 'limite', in: 'query', schema: { type: 'integer' } },
         ],
-        responses: { 200: ok({ type: 'array', items: { type: 'object' } }) },
+        responses: {
+          200: ok({ type: 'array', items: { type: 'object' } }),
+          403: erro('Só o dono'),
+        },
       },
     },
     '/painel/vendas-por-vendedor': {
       get: {
         tags: ['Painel'],
         summary: 'Vendas por vendedor (RF20)',
+        description: SO_DONO,
         parameters: [{ name: 'periodo', in: 'query', schema: { type: 'string' } }],
-        responses: { 200: ok({ type: 'array', items: { type: 'object' } }) },
+        responses: {
+          200: ok({ type: 'array', items: { type: 'object' } }),
+          403: erro('Só o dono'),
+        },
       },
     },
     '/painel/evolucao-faturamento': {
       get: {
         tags: ['Painel'],
         summary: 'Faturamento diário para gráfico (RF22)',
+        description: SO_DONO,
         parameters: [{ name: 'periodo', in: 'query', schema: { type: 'string' } }],
-        responses: { 200: ok({ type: 'array', items: { type: 'object' } }) },
+        responses: {
+          200: ok({ type: 'array', items: { type: 'object' } }),
+          403: erro('Só o dono'),
+        },
       },
     },
 

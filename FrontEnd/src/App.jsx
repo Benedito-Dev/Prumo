@@ -1,6 +1,7 @@
 import { Routes, Route } from 'react-router-dom';
 import Login from './pages/Login';
 import Painel from './pages/Painel';
+import MeuPainel from './pages/MeuPainel';
 import NovaVenda from './pages/NovaVenda';
 import Vendas from './pages/Vendas';
 import Produtos from './pages/Produtos';
@@ -11,6 +12,16 @@ import Assistente from './pages/Assistente';
 import Usuarios from './pages/Usuarios';
 import UsuarioDetalhe from './pages/UsuarioDetalhe';
 import RotaProtegida from './auth/RotaProtegida';
+import { useAuth } from './auth/AuthContext';
+
+// A tela inicial depende do papel: o dono vê os indicadores da loja, o
+// vendedor vê os próprios números. As rotas do painel da loja são
+// requireDono no back — mandar o vendedor para lá lhe daria uma tela de
+// erro como primeira coisa depois do login.
+function PainelDoPapel() {
+  const { usuario } = useAuth();
+  return usuario?.papel === 'dono' ? <Painel /> : <MeuPainel />;
+}
 
 export default function App() {
   return (
@@ -20,7 +31,7 @@ export default function App() {
         path="/"
         element={
           <RotaProtegida>
-            <Painel />
+            <PainelDoPapel />
           </RotaProtegida>
         }
       />
@@ -48,10 +59,13 @@ export default function App() {
           </RotaProtegida>
         }
       />
+      {/* A carteira de clientes e o mapa de fiados são do dono. O vendedor
+          acha e cadastra cliente dentro de Nova Venda, e recebe fiado pelo
+          aviso que aparece no meio da venda. */}
       <Route
         path="/clientes"
         element={
-          <RotaProtegida>
+          <RotaProtegida soDono>
             <Clientes />
           </RotaProtegida>
         }
@@ -59,7 +73,7 @@ export default function App() {
       <Route
         path="/clientes/:id"
         element={
-          <RotaProtegida>
+          <RotaProtegida soDono>
             <ClienteDetalhe />
           </RotaProtegida>
         }
@@ -67,7 +81,7 @@ export default function App() {
       <Route
         path="/fiados"
         element={
-          <RotaProtegida>
+          <RotaProtegida soDono>
             <Fiados />
           </RotaProtegida>
         }
@@ -80,10 +94,12 @@ export default function App() {
           </RotaProtegida>
         }
       />
+      {/* Administrar usuários sempre foi só do dono no back (requireDono);
+          o front deixava a tela abrir e ela quebrava em 403. */}
       <Route
         path="/usuarios"
         element={
-          <RotaProtegida>
+          <RotaProtegida soDono>
             <Usuarios />
           </RotaProtegida>
         }
@@ -91,7 +107,7 @@ export default function App() {
       <Route
         path="/usuarios/:id"
         element={
-          <RotaProtegida>
+          <RotaProtegida soDono>
             <UsuarioDetalhe />
           </RotaProtegida>
         }

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Search, Plus, Trash2, UserPlus, X, Check } from 'lucide-react';
 import LayoutApp from '../components/LayoutApp';
 import { vendasService } from '../services/vendas';
+import { fiadosService } from '../services/fiados';
 import { moeda } from '../utils/formato';
 
 const PAGAMENTOS = [
@@ -25,6 +26,31 @@ export default function NovaVenda() {
   const [vendaSalva, setVendaSalva] = useState(null);
   const [tipoDesconto, setTipoDesconto] = useState('valor'); // 'valor' | 'percentual'
   const [descontoInput, setDescontoInput] = useState('');
+  // Dívida do cliente escolhido — alimenta o aviso de fiado em aberto.
+  const [divida, setDivida] = useState(null);
+
+  // Escolheu um cliente? consulta se ele tem fiado em aberto.
+  // Falha em silêncio de propósito: não achar a dívida não pode impedir a
+  // venda de acontecer — a meta dos 30 segundos vale mesmo quando a
+  // consulta falha.
+  useEffect(() => {
+    if (!cliente?.id) {
+      setDivida(null);
+      return;
+    }
+    let cancelado = false;
+    fiadosService
+      .dividaDoCliente(cliente.id)
+      .then((d) => {
+        if (!cancelado) setDivida(Number(d?.total) > 0 ? d : null);
+      })
+      .catch(() => {
+        if (!cancelado) setDivida(null);
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [cliente?.id]);
 
   const subtotal = itens.reduce((s, i) => s + Number(i.quantidade || 0) * Number(i.preco_unitario || 0), 0);
   const qtdTotal = itens.reduce((s, i) => s + Number(i.quantidade || 0), 0);
@@ -192,6 +218,20 @@ export default function NovaVenda() {
               <BuscaCliente
                 onSelecionar={setCliente}
                 onNovoCliente={() => setModalCliente(true)}
+              />
+            )}
+
+            {/* Fiado em aberto deste cliente. Aparece aqui, no momento em
+                que ele é escolhido, em vez de numa tela de devedores: quem
+                atende sabe da conta de quem está na frente dele, e não do
+                mapa de quem deve para a loja. */}
+            {cliente && divida && (
+              <AvisoDivida
+                divida={divida}
+                onAbatido={(restante) =>
+                  setDivida(restante > 0 ? { ...divida, total: restante } : null)
+                }
+                clienteId={cliente.id}
               />
             )}
           </div>
@@ -422,6 +462,136 @@ export default function NovaVenda() {
         />
       )}
     </LayoutApp>
+  );
+}
+
+// ---------- Aviso de fiado em aberto ----------
+
+// O vendedor não tem a tela de Fiados: é por aqui que ele descobre que o
+// cliente à sua frente tem conta, e é por aqui que ele recebe.
+//
+// Mostra o valor e deixa abater na hora (abate da dívida mais antiga para a
+// mais nova, no servidor). Não bloqueia nada: se a pessoa quiser vender
+// assim mesmo, vende — o aviso informa, não impede.
+function AvisoDivida({ divida, clienteId, onAbatido }) {
+  const [abrindo, setAbrindo] = useState(false);
+  const [valor, setValor] = useState('');
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState('');
+  const [recibo, setRecibo] = useState(null);
+
+  const total = Number(divida.total) || 0;
+  const desde = divida.mais_antiga
+    ? new Date(divida.mais_antiga).toLocaleDateString('pt-BR')
+    : null;
+
+  async function abater() {
+    const v = Number(valor);
+    if (!v || v <= 0) {
+      setErro('Informe quanto ele está pagando.');
+      return;
+    }
+    if (v > total + 0.009) {
+      setErro(`O valor não pode passar de ${moeda(total)}.`);
+      return;
+    }
+    setSalvando(true);
+    setErro('');
+    try {
+      const r = await fiadosService.pagarCliente(clienteId, v);
+      // `total_devido_depois` vem do servidor, que fez a conta na transação.
+      const restante = Number(r?.total_devido_depois ?? total - v);
+      setRecibo({ pago: v, restante });
+      setAbrindo(false);
+      setValor('');
+      onAbatido(restante);
+    } catch (e) {
+      setErro(e.message);
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  // Depois de receber, o aviso vira confirmação — o vendedor precisa poder
+  // dizer ao cliente o que ficou registrado.
+  if (recibo) {
+    return (
+      <div className="mt-3 rounded-p border border-nivel/30 bg-nivel/5 px-3 py-2.5">
+        <p className="text-[13px] font-semibold text-nivel">
+          Recebido {moeda(recibo.pago)}
+        </p>
+        <p className="text-[12px] text-grafite-medio mt-0.5">
+          {recibo.restante > 0
+            ? `Ainda restam ${moeda(recibo.restante)} em aberto.`
+            : 'A conta deste cliente está quitada.'}
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-3 rounded-p border border-trena/40 bg-trena/5 px-3 py-2.5">
+      <p className="text-[13px] font-semibold text-grafite">
+        Este cliente tem {moeda(total)} em aberto
+      </p>
+      <p className="text-[12px] text-grafite-medio mt-0.5">
+        {divida.qtd_dividas > 1
+          ? `${divida.qtd_dividas} compras no fiado`
+          : 'Uma compra no fiado'}
+        {desde ? ` · desde ${desde}` : ''}
+        {' · em caso de dúvida, consulte o dono.'}
+      </p>
+
+      {abrindo ? (
+        <div className="mt-2.5 flex flex-col gap-2">
+          <div className="flex items-center gap-2">
+            <span className="text-[13px] text-grafite-medio">R$</span>
+            <input
+              type="number"
+              inputMode="decimal"
+              step="0.01"
+              autoFocus
+              value={valor}
+              onChange={(e) => setValor(e.target.value)}
+              placeholder={String(total.toFixed(2))}
+              className="flex-1 min-w-0 h-11 px-3 rounded-p border border-linha bg-superficie text-[15px] tabular-nums"
+            />
+            <button
+              onClick={() => setValor(String(total.toFixed(2)))}
+              className="h-11 px-3 rounded-p border border-linha text-[12.5px] font-semibold text-grafite-medio hover:text-grafite whitespace-nowrap"
+            >
+              Tudo
+            </button>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={abater}
+              disabled={salvando}
+              className="flex-1 h-11 rounded-p bg-trena hover:bg-trena-escuro disabled:opacity-60 text-white font-bold text-[13.5px]"
+            >
+              {salvando ? 'Registrando…' : 'Confirmar recebimento'}
+            </button>
+            <button
+              onClick={() => {
+                setAbrindo(false);
+                setErro('');
+              }}
+              className="h-11 px-3 rounded-p text-[13px] font-semibold text-grafite-medio hover:text-grafite"
+            >
+              Cancelar
+            </button>
+          </div>
+          {erro && <p className="text-[12.5px] text-prumo font-semibold">{erro}</p>}
+        </div>
+      ) : (
+        <button
+          onClick={() => setAbrindo(true)}
+          className="mt-2 h-11 px-3 rounded-p border border-trena/50 text-[13px] font-bold text-grafite hover:bg-trena/10"
+        >
+          Abater da dívida
+        </button>
+      )}
+    </div>
   );
 }
 

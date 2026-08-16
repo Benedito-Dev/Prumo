@@ -14,6 +14,8 @@ import ModalTrocarSenha from './ModalTrocarSenha';
 // - A partir de lg: sidebar fixa à esquerda, como era antes.
 // Alvos de toque no mobile seguem os 56–64px do documento de requisitos.
 const NAV = [
+  // O rótulo do primeiro item muda com o papel (ver `navDoPapel` abaixo):
+  // o vendedor não chega a um painel da loja, e sim aos próprios números.
   { para: '/', rotulo: 'Painel', Icone: LayoutDashboard, fim: true },
   { para: '/vendas', rotulo: 'Vendas', Icone: Receipt },
   { para: '/fiados', rotulo: 'Fiados', Icone: NotebookPen },
@@ -30,6 +32,19 @@ export default function LayoutApp({ titulo, periodo, acao, children }) {
   const ehDono = usuario?.papel === 'dono';
   const navigate = useNavigate();
   const { pathname } = useLocation();
+
+  // O menu do vendedor é menor de propósito:
+  // - "Painel" vira "Minhas vendas" (a tela por trás do link é outra);
+  // - "Clientes" sai: a carteira da loja não é ferramenta de balcão. Ele
+  //   continua achando e cadastrando cliente dentro de Nova Venda;
+  // - "Fiados" sai: o mapa de quem deve é do dono. A dívida do cliente que
+  //   ele está atendendo aparece como aviso no meio da venda.
+  const SO_DO_DONO = ['/clientes', '/fiados'];
+  const navDoPapel = NAV
+    .filter((item) => ehDono || !SO_DO_DONO.includes(item.para))
+    .map((item) =>
+      item.para === '/' && !ehDono ? { ...item, rotulo: 'Minhas vendas' } : item
+    );
 
   // Navegou? fecha o drawer — senão ele cobre a tela que acabou de abrir.
   useEffect(() => {
@@ -102,7 +117,7 @@ export default function LayoutApp({ titulo, periodo, acao, children }) {
 
         {/* navegação */}
         <nav className="flex-1 px-2.5 py-3 flex flex-col gap-0.5 overflow-y-auto">
-          {NAV.map((item) => (
+          {navDoPapel.map((item) => (
             <NavLink
               key={item.para}
               to={item.para}

@@ -5,18 +5,35 @@ import { responderErro } from '../config/erros.js';
 import * as vendas from './venda.service.js';
 
 // GET /api/vendas?de=YYYY-MM-DD&ate=YYYY-MM-DD&status=concluida&cliente_id=UUID
+//
+// O dono vê a loja inteira; o vendedor vê só o que ele mesmo lançou. O
+// recorte vem do token e SOBRESCREVE o que veio na query — sem isso,
+// bastaria mandar ?usuario_id=<id do colega> para ler as vendas dele.
 export async function listarVendas(req, res) {
   try {
-    res.json(await vendas.listarVendas(req.query));
+    const filtros = { ...req.query };
+    if (req.usuario.papel !== 'dono') {
+      filtros.usuario_id = req.usuario.id;
+    }
+    res.json(await vendas.listarVendas(filtros));
   } catch (erro) {
     responderErro(res, erro, 'Falha ao listar vendas');
   }
 }
 
 // GET /api/vendas/:id — cabeçalho + itens
+//
+// Filtrar só a listagem não bastaria: o id da venda vai na URL, e sem esta
+// checagem o vendedor leria a venda de um colega trocando o endereço.
+// Responde 404, não 403 — dizer "existe, mas não é sua" já confirmaria a
+// venda a quem não deveria saber dela.
 export async function buscarVenda(req, res) {
   try {
-    res.json(await vendas.exigirVenda(req.params.id));
+    const venda = await vendas.exigirVenda(req.params.id);
+    if (req.usuario.papel !== 'dono' && venda.usuario_id !== req.usuario.id) {
+      return res.status(404).json({ erro: 'Venda não encontrada' });
+    }
+    res.json(venda);
   } catch (erro) {
     responderErro(res, erro, 'Falha ao buscar venda');
   }

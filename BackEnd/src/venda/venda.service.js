@@ -26,7 +26,10 @@ const SELECT_VENDA = `
 // Centavo: o dinheiro nunca sai daqui com resto de ponto flutuante.
 const emReais = (n) => Number(Number(n).toFixed(2));
 
-export async function listarVendas({ de, ate, status, cliente_id } = {}) {
+// `usuario_id` restringe a lista a um vendedor. Quem decide passá-lo é o
+// controller, a partir do papel no token — nunca o cliente da requisição,
+// senão bastaria omitir o parâmetro para ver as vendas de todo mundo.
+export async function listarVendas({ de, ate, status, cliente_id, usuario_id } = {}) {
   const condicoes = [];
   const params = [];
 
@@ -46,6 +49,10 @@ export async function listarVendas({ de, ate, status, cliente_id } = {}) {
   if (cliente_id) {
     params.push(cliente_id);
     condicoes.push(`v.cliente_id = $${params.length}`);
+  }
+  if (usuario_id) {
+    params.push(usuario_id);
+    condicoes.push(`v.usuario_id = $${params.length}`);
   }
 
   const where = condicoes.length ? `WHERE ${condicoes.join(' AND ')}` : '';

@@ -90,6 +90,24 @@ Ao mexer em `corrigirDitado.js`:
 - **Nome ambíguo não é corrigido** de propósito: deixa como falado e o resolvedor do Zé pergunta. Corrigir para o nome errado é pior que não corrigir — o texto errado a pessoa vê, o trocado ela não percebe.
 - O texto parcial (enquanto a pessoa fala) **não** passa pelo corretor: trocar nome no meio da fala faria o texto dançar na tela.
 
+## Módulos puros em `utils/` — onde mora o dinheiro
+
+Quatro módulos sem React, sem DOM e sem rede, cada um com suíte em Node puro (**191 testes no total**). Rode a suíte correspondente ao mexer:
+
+| Módulo | Testes | O que guarda |
+|---|---|---|
+| `corrigirDitado.js` | 59 | transcrição de voz contra o catálogo |
+| `calculoVenda.js` | 63 | subtotal, desconto, troco, payload, validação |
+| `recibo.js` | 42 | comprovante térmico e WhatsApp |
+| `cobranca.js` | 27 | texto da cobrança de fiado |
+
+**Regra:** lógica que calcula dinheiro não fica dentro do componente. `NovaVenda.jsx` tinha as contas misturadas com `useState` e JSX num arquivo de 850 linhas — impossível de testar sem navegador, e é onde um erro custa caro sem aparecer.
+
+`calculoVenda.js` guarda duas armadilhas que a suíte trava:
+- `<input type="number">` devolve **string**. `"315" + "425"` vira `"315425"` se alguém somar sem converter.
+- `emReais` espelha o `emReais` do backend. Se os dois arredondarem diferente, a tela mostra um total e o banco grava outro.
+- `troco` é `null` enquanto o campo está vazio — sem isso a tela mostrava "Falta R$ 300,00" antes de a pessoa contar o dinheiro.
+
 ## Recibo da venda
 
 `utils/recibo.js` é **módulo puro** (sem React, sem DOM, sem rede) — como o corretor de ditado, e pelo mesmo motivo: dá para testá-lo em Node sem navegador nem impressora. Rode `node FrontEnd/src/utils/recibo.test.mjs` (42 testes) ao mexer.
@@ -105,6 +123,16 @@ Ao mexer em `corrigirDitado.js`:
 Venda cancelada **não** oferece recibo: o papel diria que a compra aconteceu.
 
 Os dados do cabeçalho vêm de `GET /api/loja` (variáveis `LOJA_NOME`, `LOJA_TELEFONE`, `LOJA_ENDERECO`). Se a requisição falhar, o recibo sai com a marca PRUMO — a identificação da loja nunca pode impedir o cliente de sair com o papel.
+
+## Cobrança de fiado — o tom é requisito
+
+`cobranca.js` monta o texto do WhatsApp. **O tom é decisão de produto, não estilo:** quem deve no depósito é cliente antigo, pedreiro do bairro, gente que vai voltar. Cobrança ríspida resolve uma conta e perde um cliente.
+
+O texto lembra em vez de exigir, chama pelo primeiro nome, e abre espaço para negociar ("se precisar de mais prazo, é só falar"). **Não usa** "dívida", "devedor", "inadimplente", "pendência", "juros", "multa", "nome sujo", "urgente" — a suíte tem um teste que falha se qualquer uma dessas palavras aparecer.
+
+Nada é enviado sozinho: o link abre o WhatsApp com o texto pronto e quem manda é a pessoa, depois de ler.
+
+O vencimento vem do **prazo padrão da loja** (`LOJA_PRAZO_FIADO_DIAS`, 30 por padrão), calculado no backend sobre a data da venda — não há coluna de vencimento no schema. Calcular lá, e não na tela, é o que faz a lista, o painel e o Zé usarem a mesma régua.
 
 ## Lint
 

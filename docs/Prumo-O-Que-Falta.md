@@ -22,8 +22,8 @@ não esquecimento.
 | 5 | ~~**Editar venda lançada**~~ ✅ **feito em 16/08/2026** | Só existia criar e cancelar. Agora "Corrigir venda" cancela a original e reabre a tela preenchida — sem redigitar nada, e sem reescrever histórico. | M | `venda.service.js` |
 | 6 | **Funcionar com internet caindo** | Depósito tem Wi-Fi ruim. Se cai no meio da venda, perde tudo. Rascunho em `localStorage` + fila de reenvio salva o núcleo sem virar PWA completo. | M–G | `NovaVenda.jsx` |
 | 7 | **Log de auditoria** | O schema já prevê `log_auditoria` como fase futura e nunca saiu. Quem cancelou a venda de R$ 4.000? Quem mudou o preço? Com dinheiro fiado envolvido, é questão de tempo. | M | schema + services |
-| 8 | **Cobrança de fiado é passiva** | O módulo registra e consolida, mas ninguém avisa. Falta vencimento + lista de atrasados + botão de mensagem no WhatsApp. Fiado esquecido é prejuízo direto. | M | `fiado` |
-| 9 | **Nenhum teste do que o usuário vê** | `npm test` cobre services e tools; o ditado tem 59 testes. As 11 páginas React e todos os controllers HTTP têm zero. `NovaVenda.jsx` tem 791 linhas e é o coração do produto. | M | novo |
+| 8 | ~~**Cobrança de fiado é passiva**~~ ✅ **feito em 16/08/2026** | Agora há prazo padrão configurável, atrasados destacados e ordenados na tela, cobrança pronta no WhatsApp e alerta de vencido no painel. | M | `fiado` + `cobranca.js` |
+| 9 | ~~**Nenhum teste do que o usuário vê**~~ ✅ **feito em 16/08/2026** | As contas de `NovaVenda.jsx` saíram para `utils/calculoVenda.js` com 63 testes. O front passou de 59 para 191 testes. Renderização segue sem cobertura — decisão consciente, ver abaixo. | M | `calculoVenda.js` |
 | 10 | **Sem caminho para produção** | Sem migração de banco (`down -v` para mudar schema é inviável com dado real), sem backup, sem CI, sem plano de deploy. Pronto para demo, não para o primeiro cliente. | M–G | infra |
 
 ---
@@ -33,9 +33,46 @@ não esquecimento.
 1. ~~**#2 + #3**~~ ✅ **concluído em 15/08/2026** (ver "Parte 1" abaixo).
 2. ~~**#1**~~ ✅ **concluído em 16/08/2026** (ver "Recibo" abaixo).
 3. ~~**#5**~~ ✅ **concluído em 16/08/2026** (ver "Corrigir venda" abaixo).
-4. **#10** — sem migração, todo o resto vira retrabalho no dia que existir dado real.
+4. ~~**#9** e **#8**~~ ✅ **concluídos em 16/08/2026** (ver as duas seções finais).
+5. **#10** — sem migração, todo o resto vira retrabalho no dia que existir dado real.
 
-Próximos candidatos: **#10** (produção), **#9** (testes de tela — `NovaVenda.jsx` já foi mexida três vezes esta semana sem rede) e **#6** (internet caindo).
+**Restam:** #10 (produção), #6 (internet caindo), #7 (auditoria), #4 (validação de entrada).
+
+---
+
+## Testes do front (16/08/2026) — item #9
+
+**O caminho escolhido:** extrair, não instalar framework. As contas de `NovaVenda.jsx` (subtotal, desconto, troco, montagem do payload, validação, adicionar item) saíram para `utils/calculoVenda.js` — módulo puro, testável em Node, **zero dependências novas**. O `CLAUDE.md` registra a ausência de framework como decisão, e não havia motivo para reabri-la.
+
+O front foi de **59 para 191 testes** (63 novos aqui + 42 do recibo + 27 da cobrança + 59 do ditado).
+
+**O que a suíte trava:**
+- `<input type="number">` devolve string — `"315" + "425"` viraria `"315425"` se alguém somasse sem converter.
+- `emReais` da tela espelha o do backend; se divergirem, a tela mostra um total e o banco grava outro.
+- Desconto maior que a venda é limitado no cliente, não só recusado pelo servidor depois do clique.
+- O payload **não** leva `usuario_id` — quem vendeu sai do token.
+
+**Melhoria de comportamento no caminho:** o troco aparecia como "Falta R$ 300,00" com o campo de recebido ainda vazio. Agora é `null` até alguém digitar.
+
+**Fora de escopo, conscientemente:** renderização e clique continuam sem cobertura. Testar isso exige Vitest + Testing Library (~4 dependências num projeto com 6). Se um bug de renderização aparecer, a decisão se reabre — hoje não havia sintoma que justificasse.
+
+---
+
+## Vencimento e cobrança de fiado (16/08/2026) — item #8
+
+**Prazo padrão, não data por venda.** `LOJA_PRAZO_FIADO_DIAS` (30 por padrão) aplicado sobre a data da venda. Data por venda exigiria coluna nova, e sem ferramenta de migração isso significa recriar o banco — inviável com dado real. O prazo geral também reflete melhor como depósito combina ("pra semana que vem"), e vale retroativamente para as dívidas que já existem.
+
+**O que existe agora:**
+- Tela de Fiados ordena por **atraso primeiro**, não por valor: ordenar por valor faria a conta grande e nova esconder a pequena e velha, que é justamente a que precisa de cobrança.
+- Selo de "45d de atraso" no nome, filtro "ver só os atrasados", KPI de vencido separado do total a receber.
+- Botão de cobrar que abre o WhatsApp com texto pronto.
+- Alerta no painel quando há vencido, levando direto para a cobrança.
+
+**O tom da cobrança é requisito testado.** Quem deve no depósito é cliente que vai voltar; cobrança ríspida resolve uma conta e perde um cliente. A suíte falha se aparecerem "dívida", "devedor", "inadimplente", "juros", "multa", "nome sujo" ou "urgente".
+
+**Decisões de UX que valem registrar:** o KPI de vencido só fica vermelho quando há valor vencido, e o alerta do painel só aparece quando existe — um alarme permanente marcando R$ 0,00 treina a pessoa a ignorar a cor no dia em que ela importa.
+
+**Verificação:** 27/27 na suíte de cobrança, 16/16 contra a API com datas controladas (5 dias, 30 exatos, 75 dias), 165/165 na suíte do Zé, lint e build limpos.
 
 ---
 

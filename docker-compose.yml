@@ -43,6 +43,8 @@ services:
       LOJA_NOME: ${LOJA_NOME:-PRUMO}
       LOJA_TELEFONE: ${LOJA_TELEFONE:-}
       LOJA_ENDERECO: ${LOJA_ENDERECO:-}
+      # prazo padrão do fiado, em dias (não há data por venda no schema)
+      LOJA_PRAZO_FIADO_DIAS: ${LOJA_PRAZO_FIADO_DIAS:-30}
       # Chave do assistente (Zé). Vem do arquivo .env da raiz, que NÃO
       # entra no Git — segredo não mora em arquivo versionado.
       # Sem ela, /api/assistente responde 503 e o resto segue normal.

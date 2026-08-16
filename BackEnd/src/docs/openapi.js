@@ -794,6 +794,11 @@ export const openapiSpec = {
               nome: { type: 'string', example: 'Deposito Sao Jose' },
               telefone: { type: 'string', example: '(11) 3456-7890' },
               endereco: { type: 'string', example: 'Rua das Obras, 120 - Centro' },
+              prazo_fiado_dias: {
+                type: 'integer',
+                example: 30,
+                description: 'prazo padrão do fiado (LOJA_PRAZO_FIADO_DIAS)',
+              },
             },
           }),
         },
@@ -899,14 +904,21 @@ export const openapiSpec = {
     '/fiados/resumo': {
       get: {
         tags: ['Fiados'],
-        summary: 'Total a receber e nº de dívidas em aberto',
-        description: SO_DONO,
+        summary: 'Total a receber, com o pedaço vencido separado',
+        description:
+          SO_DONO +
+          ' "A receber" é expectativa e "vencido" é problema — dois números diferentes ' +
+          'para quem cobra. O vencimento sai do prazo padrão da loja aplicado sobre a ' +
+          'data da venda; não há coluna de vencimento no schema.',
         responses: {
           200: ok({
             type: 'object',
             properties: {
               total_receber: { type: 'number' },
               qtd: { type: 'integer' },
+              total_vencido: { type: 'number', description: 'parte que passou do prazo' },
+              qtd_vencidas: { type: 'integer' },
+              prazo_dias: { type: 'integer', example: 30 },
             },
           }),
           403: erro('Só o dono'),

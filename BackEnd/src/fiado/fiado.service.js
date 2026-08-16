@@ -9,6 +9,7 @@
 // — daí a cascata em `registrarPagamentoEmCascata`.
 import { pool, query } from '../config/db.js';
 import { ErroNegocio, naoEncontrado } from '../config/erros.js';
+import { prazoFiadoDias } from '../config/loja.js';
 
 // Centavo de ponto flutuante: NUMERIC(12,2) do banco vs. float do JS.
 // Tudo que vira dinheiro passa por aqui antes de ser gravado ou devolvido.
@@ -39,12 +40,28 @@ const SELECT_ABERTOS = `
 
 // O SELECT devolve NUMERIC como string (driver pg). Converter na borda
 // evita que "315" + "425" vire "315425" lá na frente.
-const numerizarDivida = (row) => ({
-  ...row,
-  valor_total: Number(row.valor_total),
-  pago: Number(row.pago),
-  saldo: Number(row.saldo),
-});
+//
+// `vence_em`, `dias_atraso` e `vencida` saem do prazo padrão da loja
+// aplicado sobre a data da venda — o schema não tem coluna de vencimento
+// (ver config/loja.js). Calculado aqui, e não na tela, para que a lista, o
+// painel e o Zé usem exatamente a mesma régua.
+const numerizarDivida = (row) => {
+  const prazo = prazoFiadoDias();
+  const diasAtraso = Math.max((Number(row.dias) || 0) - prazo, 0);
+
+  const vence = new Date(row.vendida_em);
+  vence.setDate(vence.getDate() + prazo);
+
+  return {
+    ...row,
+    valor_total: Number(row.valor_total),
+    pago: Number(row.pago),
+    saldo: Number(row.saldo),
+    vence_em: vence.toISOString(),
+    dias_atraso: diasAtraso,
+    vencida: diasAtraso > 0,
+  };
+};
 
 // Todas as dívidas em aberto, mais antigas primeiro (é a ordem em que o
 // dono cobra, e a mesma da cascata).
@@ -58,23 +75,39 @@ export async function listarAbertos() {
   return rows.map(numerizarDivida);
 }
 
+// Total a receber, com o pedaço já vencido separado.
+//
+// "R$ 4.000 a receber" e "R$ 1.200 disso está atrasado" são dois números
+// diferentes para quem cobra: o primeiro é expectativa, o segundo é
+// problema. O corte do vencimento entra por parâmetro (não concatenado):
+// o prazo vem de variável de ambiente e não deve ir cru para o SQL.
 export async function resumoAbertos() {
+  const prazo = prazoFiadoDias();
   const { rows } = await query(
     `SELECT
        COALESCE(SUM(saldo), 0) AS total_receber,
-       COUNT(*)                AS qtd
+       COUNT(*)                AS qtd,
+       COALESCE(SUM(saldo) FILTER (WHERE dias > $1), 0) AS total_vencido,
+       COUNT(*) FILTER (WHERE dias > $1)                AS qtd_vencidas
      FROM (
-       SELECT v.id, v.valor_total - COALESCE(SUM(pf.valor), 0) AS saldo
+       SELECT
+         v.id,
+         v.valor_total - COALESCE(SUM(pf.valor), 0) AS saldo,
+         EXTRACT(DAY FROM NOW() - v.vendida_em)::int AS dias
        FROM venda v
        LEFT JOIN pagamento_fiado pf ON pf.venda_id = v.id
        WHERE v.status = 'concluida' AND v.forma_pagamento = 'fiado'
        GROUP BY v.id
        HAVING v.valor_total - COALESCE(SUM(pf.valor), 0) > ${TOLERANCIA}
-     ) sub`
+     ) sub`,
+    [prazo]
   );
   return {
     total_receber: Number(rows[0].total_receber),
     qtd: Number(rows[0].qtd),
+    total_vencido: Number(rows[0].total_vencido),
+    qtd_vencidas: Number(rows[0].qtd_vencidas),
+    prazo_dias: prazo,
   };
 }
 

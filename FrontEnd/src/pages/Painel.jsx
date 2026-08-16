@@ -4,6 +4,7 @@ import LayoutApp from '../components/LayoutApp';
 import { Botao, EstadoVazio } from '../components';
 import GraficoArea from '../components/GraficoArea';
 import { painelService } from '../services/painel';
+import { fiadosService } from '../services/fiados';
 import { api } from '../services/api';
 import { moeda, numero } from '../utils/formato';
 import {
@@ -43,15 +44,19 @@ export default function Painel() {
   const carregar = useCallback(async (per) => {
     setErro('');
     try {
-      const [faturamento, resumo, ranking, evolucao, produtos, vendas] = await Promise.all([
-        painelService.faturamento(),
-        painelService.resumo(per),
-        painelService.rankingClientes(per, 6),
-        painelService.evolucaoFaturamento(per),
-        painelService.produtosMaisVendidos(per, 6),
-        api.get('/vendas?status=concluida'),
-      ]);
-      setDados({ faturamento, resumo, ranking, evolucao, produtos, vendas });
+      const [faturamento, resumo, ranking, evolucao, produtos, vendas, fiado] =
+        await Promise.all([
+          painelService.faturamento(),
+          painelService.resumo(per),
+          painelService.rankingClientes(per, 6),
+          painelService.evolucaoFaturamento(per),
+          painelService.produtosMaisVendidos(per, 6),
+          api.get('/vendas?status=concluida'),
+          // Fiado não depende do período: o que está em aberto está em
+          // aberto, mesmo que a venda seja de três meses atrás.
+          fiadosService.resumo(),
+        ]);
+      setDados({ faturamento, resumo, ranking, evolucao, produtos, vendas, fiado });
     } catch {
       setErro('Não foi possível carregar os indicadores.');
     } finally {
@@ -118,7 +123,7 @@ export default function Painel() {
     );
   }
 
-  const { faturamento, resumo, ranking, evolucao, produtos, vendas } = dados;
+  const { faturamento, resumo, ranking, evolucao, produtos, vendas, fiado } = dados;
   const semVendas = resumo.qtd_vendas === 0;
 
   // recebimento por forma
@@ -162,6 +167,29 @@ export default function Painel() {
   return (
     <LayoutApp titulo="Painel" periodo={periodoLabel} acao={acaoTopbar}>
       {periodosNoCorpo}
+
+      {/* Fiado vencido: aparece só quando existe, e leva direto para a
+          cobrança. Um alerta permanente marcando R$ 0,00 treina a pessoa a
+          ignorar a cor justamente no dia em que ela importa. */}
+      {Number(fiado?.total_vencido) > 0 && (
+        <button
+          onClick={() => navigate('/fiados')}
+          className="w-full mb-4 rounded-md border border-prumo/30 bg-prumo/5 px-5 py-3 flex items-center justify-between gap-3 text-left hover:bg-prumo/10 transition-colors"
+        >
+          <div className="min-w-0">
+            <p className="text-[13.5px] font-bold text-prumo">
+              {moeda(fiado.total_vencido)} vencidos
+            </p>
+            <p className="text-[12.5px] text-grafite-medio mt-0.5">
+              {fiado.qtd_vencidas === 1
+                ? 'Uma conta passou do prazo'
+                : `${fiado.qtd_vencidas} contas passaram do prazo`}{' '}
+              de {fiado.prazo_dias} dias · toque para cobrar
+            </p>
+          </div>
+          <span className="text-[12.5px] font-bold text-prumo shrink-0">Ver fiados →</span>
+        </button>
+      )}
       {semVendas ? (
         <EstadoVazio
           titulo="Nenhuma venda no período"

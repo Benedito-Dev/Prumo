@@ -34,10 +34,14 @@ cd BackEnd && npm test                              # suíte de services e tools
 docker exec prumo-api node scripts/testar-tools.mjs # a mesma suíte, dentro do container
 node FrontEnd/src/utils/corrigirDitado.test.mjs     # 59 testes do corretor de ditado (Node puro)
 node FrontEnd/src/utils/recibo.test.mjs             # 42 testes do recibo (Node puro)
+node FrontEnd/src/utils/calculoVenda.test.mjs       # 63 testes das contas da venda (Node puro)
+node FrontEnd/src/utils/cobranca.test.mjs           # 27 testes da cobrança de fiado (Node puro)
 cd FrontEnd && npm run lint                         # oxlint
 ```
 
-Não há framework de teste, watcher nem CI: são scripts `.mjs` com asserts próprios. Ao mexer em service, tool, no corretor de ditado ou no recibo, **rode a suíte correspondente e mostre a saída**. `npm test` no BackEnd falha sem banco de pé e sem nenhum usuário cadastrado (as FKs de autoria exigem um usuário real).
+Não há framework de teste, watcher nem CI: são scripts `.mjs` com asserts próprios. Ao mexer em service, tool ou em qualquer módulo de `FrontEnd/src/utils/`, **rode a suíte correspondente e mostre a saída**.
+
+**Lógica que envolve dinheiro sai da tela e vira módulo puro em `utils/`, com suíte própria.** É o que permite testá-la sem navegador. Foi assim com o ditado, o recibo, as contas da venda e a cobrança — se a próxima feature calcular valor, siga o mesmo caminho em vez de somar dentro do componente. `npm test` no BackEnd falha sem banco de pé e sem nenhum usuário cadastrado (as FKs de autoria exigem um usuário real).
 
 ## Arquitetura — as regras que não se quebram
 

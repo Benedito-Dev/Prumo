@@ -1,7 +1,12 @@
 import { useState, useEffect } from 'react';
-import { NotebookPen, Wallet, Users, X, Check, ChevronDown, ChevronRight, Search } from 'lucide-react';
+import {
+  NotebookPen, Wallet, Users, X, Check, ChevronDown, ChevronRight, Search,
+  AlertTriangle, MessageCircle,
+} from 'lucide-react';
 import LayoutApp from '../components/LayoutApp';
 import { fiadosService } from '../services/fiados';
+import { lojaService } from '../services/loja';
+import { linkCobranca } from '../utils/cobranca';
 import { moeda, numero } from '../utils/formato';
 
 /* Avatar do cliente: sem foto, sem cadastro. A cor sai do próprio nome, então
@@ -38,6 +43,8 @@ export default function Fiados() {
   const [pagando, setPagando] = useState(null); // dívida sendo paga
   const [expandido, setExpandido] = useState({}); // cliente_id -> bool
   const [busca, setBusca] = useState('');
+  const [soAtrasados, setSoAtrasados] = useState(false);
+  const [loja, setLoja] = useState({});
 
   async function carregar() {
     setCarregando(true);
@@ -50,6 +57,9 @@ export default function Fiados() {
 
   useEffect(() => {
     carregar();
+    // A loja assina a cobrança. Falha em silêncio: sem ela a mensagem sai
+    // sem assinatura, o que é melhor que não deixar cobrar.
+    lojaService.dados().then(setLoja).catch(() => setLoja({}));
   }, []);
 
   // Consolidação por cliente (decisão: banco por venda, tela agrupa)
@@ -70,29 +80,51 @@ export default function Fiados() {
   });
   // Dentro de cada cliente, a dívida mais antiga vem primeiro: é ela que o
   // botão "Receber" quita, e é assim que o pagamento acontece no balcão.
-  Object.values(grupos).forEach((g) =>
-    g.vendas.sort((a, b) => new Date(a.vendida_em) - new Date(b.vendida_em))
-  );
-  const listaGrupos = Object.values(grupos).sort((a, b) => b.total - a.total);
+  Object.values(grupos).forEach((g) => {
+    g.vendas.sort((a, b) => new Date(a.vendida_em) - new Date(b.vendida_em));
+    // O atraso do cliente é o da dívida mais atrasada dele: é o número que
+    // decide a ordem da fila de cobrança.
+    g.diasAtraso = Math.max(...g.vendas.map((v) => Number(v.dias_atraso) || 0), 0);
+    g.vencido = g.vendas.reduce((s, v) => s + (v.vencida ? Number(v.saldo) : 0), 0);
+  });
+
+  // Quem está atrasado vem primeiro, do mais atrasado para o menos; depois
+  // os em dia, por valor. Ordenar só por valor faria a conta grande e nova
+  // esconder a pequena e velha, que é justamente a que precisa de cobrança.
+  const listaGrupos = Object.values(grupos).sort((a, b) => {
+    if (a.diasAtraso !== b.diasAtraso) return b.diasAtraso - a.diasAtraso;
+    return b.total - a.total;
+  });
 
   const totalReceber = dividas.reduce((s, d) => s + d.saldo, 0);
+  const totalVencido = dividas.reduce((s, d) => s + (d.vencida ? d.saldo : 0), 0);
   const devedores = listaGrupos.length;
+  const devedoresAtrasados = listaGrupos.filter((g) => g.diasAtraso > 0).length;
 
   // A busca filtra só a lista — os KPIs continuam mostrando o total do negócio.
   const termo = busca.trim().toLowerCase();
-  const gruposVisiveis = termo
+  const porTexto = termo
     ? listaGrupos.filter(
         (g) =>
           g.nome.toLowerCase().includes(termo) || (g.telefone || '').includes(busca.trim())
       )
     : listaGrupos;
+  const gruposVisiveis = soAtrasados ? porTexto.filter((g) => g.diasAtraso > 0) : porTexto;
 
   return (
     <LayoutApp titulo="Fiados">
       <div className="flex flex-col gap-4 h-full min-h-[500px]">
-        {/* KPIs */}
-        <div className="grid grid-cols-2 gap-3 shrink-0 max-w-[560px]">
+        {/* KPIs. "A receber" é expectativa; "vencido" é problema — são dois
+            números diferentes para quem cobra, e por isso não se somam num
+            só cartão. */}
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 shrink-0 max-w-[840px]">
           <KpiF Icone={Wallet} rotulo="Total a receber" valor={moeda(totalReceber)} destaque />
+          <KpiF
+            Icone={AlertTriangle}
+            rotulo="Vencido"
+            valor={moeda(totalVencido)}
+            alerta={totalVencido > 0}
+          />
           <KpiF Icone={Users} rotulo="Clientes devendo" valor={numero(devedores)} />
         </div>
 
@@ -116,6 +148,24 @@ export default function Fiados() {
               </button>
             )}
           </div>
+        )}
+
+        {/* Filtro de atrasados. Só aparece quando há atrasado — um botão
+            que nunca tem o que mostrar é ruído na tela. */}
+        {!carregando && devedoresAtrasados > 0 && (
+          <button
+            onClick={() => setSoAtrasados((v) => !v)}
+            className={`shrink-0 self-start h-10 px-3 rounded-p border text-[13px] font-bold flex items-center gap-2 transition-colors ${
+              soAtrasados
+                ? 'border-prumo bg-prumo/10 text-prumo'
+                : 'border-linha text-grafite-medio hover:text-grafite'
+            }`}
+          >
+            <AlertTriangle size={15} />
+            {soAtrasados
+              ? `Mostrando ${devedoresAtrasados} atrasado(s) · ver todos`
+              : `Ver só os ${devedoresAtrasados} atrasado(s)`}
+          </button>
         )}
 
         {/* lista agrupada por cliente */}
@@ -170,7 +220,14 @@ export default function Fiados() {
                             {iniciais(g.nome)}
                           </span>
                           <div className="flex-1 min-w-0">
-                            <p className="text-[16px] font-bold truncate">{g.nome}</p>
+                            <p className="text-[16px] font-bold truncate flex items-center gap-2">
+                              <span className="truncate">{g.nome}</span>
+                              {g.diasAtraso > 0 && (
+                                <span className="shrink-0 px-1.5 py-0.5 rounded text-[11px] font-bold bg-prumo/10 text-prumo tabular-nums">
+                                  {g.diasAtraso}d de atraso
+                                </span>
+                              )}
+                            </p>
                             <p className="text-[13px] text-grafite-medio flex items-center gap-1">
                               {aberto ? (
                                 <ChevronDown size={14} className="shrink-0" />
@@ -193,15 +250,30 @@ export default function Fiados() {
                         </div>
                       </div>
 
-                      {/* Ação principal. Sempre abre o modal, já na dívida mais
-                          antiga — no balcão o cliente quita a mais velha
-                          primeiro. Pra pagar outra, basta expandir e escolher. */}
-                      <button
-                        onClick={() => setPagando(g.vendas[0])}
-                        className="shrink-0 w-full sm:w-auto px-4 sm:px-5 h-12 rounded-p bg-nivel text-white text-[14px] font-bold hover:bg-nivel/90"
-                      >
-                        Receber
-                      </button>
+                      <div className="flex gap-2 shrink-0 w-full sm:w-auto">
+                        {/* Cobrar no WhatsApp. Abre a conversa com o texto
+                            pronto; quem envia é a pessoa, depois de ler. */}
+                        <button
+                          onClick={() =>
+                            window.open(linkCobranca(g, g.vendas, loja), '_blank')
+                          }
+                          title="Cobrar no WhatsApp"
+                          className="shrink-0 px-4 h-12 rounded-p border border-linha text-[14px] font-bold text-grafite hover:bg-concreto flex items-center gap-2"
+                        >
+                          <MessageCircle size={16} />
+                          <span className="sm:hidden">Cobrar</span>
+                        </button>
+
+                        {/* Ação principal. Sempre abre o modal, já na dívida mais
+                            antiga — no balcão o cliente quita a mais velha
+                            primeiro. Pra pagar outra, basta expandir e escolher. */}
+                        <button
+                          onClick={() => setPagando(g.vendas[0])}
+                          className="flex-1 sm:flex-none px-4 sm:px-5 h-12 rounded-p bg-nivel text-white text-[14px] font-bold hover:bg-nivel/90"
+                        >
+                          Receber
+                        </button>
+                      </div>
                     </div>
 
                     {/* dívidas do cliente (expandido) */}
@@ -271,20 +343,28 @@ export default function Fiados() {
   );
 }
 
-function KpiF({ Icone, rotulo, valor, destaque = false }) {
+// `alerta` só pinta de vermelho quando há valor vencido — um cartão
+// vermelho marcando R$ 0,00 treina a pessoa a ignorar a cor.
+function KpiF({ Icone, rotulo, valor, destaque = false, alerta = false }) {
+  const moldura = alerta
+    ? 'bg-prumo/5 border-prumo/30'
+    : destaque
+      ? 'bg-trena/5 border-trena/30'
+      : 'bg-superficie border-linha';
+  const corValor = alerta ? 'text-prumo' : destaque ? 'text-trena-escuro' : '';
+  const corIcone = alerta
+    ? 'text-prumo/50'
+    : destaque
+      ? 'text-trena-escuro/50'
+      : 'text-grafite-medio/40';
+
   return (
-    <div
-      className={`rounded-md px-4 py-3 border flex items-center justify-between ${
-        destaque ? 'bg-trena/5 border-trena/30' : 'bg-superficie border-linha'
-      }`}
-    >
+    <div className={`rounded-md px-4 py-3 border flex items-center justify-between ${moldura}`}>
       <div>
         <p className="text-[10.5px] font-bold uppercase tracking-wide text-grafite-medio">{rotulo}</p>
-        <p className={`text-[22px] font-bold tabular-nums mt-1 ${destaque ? 'text-trena-escuro' : ''}`}>
-          {valor}
-        </p>
+        <p className={`text-[22px] font-bold tabular-nums mt-1 ${corValor}`}>{valor}</p>
       </div>
-      <Icone size={20} className={destaque ? 'text-trena-escuro/50' : 'text-grafite-medio/40'} />
+      <Icone size={20} className={corIcone} />
     </div>
   );
 }

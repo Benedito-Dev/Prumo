@@ -7,7 +7,13 @@
   "scripts": {
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
-    "test": "node scripts/testar-tools.mjs"
+    "test": "node scripts/testar-tools.mjs",
+    "migrar": "node scripts/migrar.mjs",
+    "migrar:status": "node scripts/migrar.mjs --status",
+    "backup": "node scripts/backup.mjs",
+    "restaurar": "node scripts/restaurar.mjs",
+    "backup:docker": "bash ../scripts/backup-docker.sh",
+    "restaurar:docker": "bash ../scripts/restaurar-docker.sh"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

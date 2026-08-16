@@ -145,9 +145,37 @@ No front, `App.jsx` escolhe a tela pelo papel (`PainelDoPapel`): o dono vê `Pai
 
 O `app.js` tem, no fim, um 404 em JSON e um middleware de erro de 4 argumentos. Eles são rede de segurança para o controller que esquecer o `try/catch`, não substituto dele.
 
+## Migrações
+
+**Toda mudança de schema é um arquivo em `BackEnd/migracoes/NNN-descricao.sql`**, aplicado em ordem alfabética (daí o prefixo numérico) pelo `config/migracoes.js`. A API migra no boot, antes de aceitar requisição — subir com schema velho faria as consultas quebrarem em cima de coluna inexistente. Migração que falha **derruba o boot** de propósito: o erro aparece no deploy, não no meio de uma venda.
+
+Sem dependência nova — o projeto não tem ferramenta de migração e não era hora de adicionar uma.
+
+As invariantes:
+
+1. **Cada migração roda em transação**, e o registro em `migracao` acontece **na mesma transação**. Separados, uma queda entre os dois deixaria a migração aplicada e não registrada, e a próxima execução tentaria de novo.
+2. **Arquivo aplicado nunca é editado.** Corrigir uma migração antiga muda o schema de quem ainda não a aplicou e não muda o de quem já aplicou — dois bancos divergem em silêncio. Conserte com uma migração nova.
+3. **Advisory lock** (`pg_advisory_lock`) impede duas instâncias migrando ao mesmo tempo.
+4. `docs/schema.sql` continua sendo o retrato para quem cria banco do zero. **Mantenha os dois em dia**: schema novo e schema migrado precisam terminar iguais.
+
+```bash
+npm run migrar:status --prefix BackEnd   # o que já foi aplicado
+npm run migrar --prefix BackEnd          # aplica pendentes sem subir a API
+```
+
+## Backup
+
+`bash scripts/backup-docker.sh` gera um `.sql` em `backups/` (fora do Git — são dados reais de venda e telefone de cliente) e mantém os 7 mais recentes.
+
+O `pg_dump` **não existe** no container da API (`node:22-alpine`); quem tem é o container `db`. Por isso o script de uso diário passa por ele. `BackEnd/scripts/backup.mjs` existe para bancos remotos (Neon), rodando de uma máquina com o client do Postgres.
+
+**Restaurar é parte do backup, não um extra:** `bash scripts/restaurar-docker.sh <arquivo> --sim`. Exige `--sim` porque apaga o banco atual, e usa `ON_ERROR_STOP=1` — sem isso o psql seguiria depois de um erro e deixaria o banco meio restaurado, o pior desfecho.
+
+Este ciclo foi testado de ponta a ponta: backup, `DELETE` em todas as vendas, restauração, 16 vendas de volta.
+
 ## Schema (`docs/schema.sql`)
 
-PKs são `UUID DEFAULT gen_random_uuid()`. Sem ferramenta de migração: alterar o schema exige `docker compose down -v`.
+PKs são `UUID DEFAULT gen_random_uuid()`.
 
 Pontos com intenção embutida:
 - `venda.cliente_id` anulável = venda "Consumidor" (RF03). `usuario_id` é `NOT NULL` (RF13).

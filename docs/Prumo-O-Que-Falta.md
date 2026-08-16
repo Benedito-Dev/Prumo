@@ -24,7 +24,7 @@ não esquecimento.
 | 7 | **Log de auditoria** | O schema já prevê `log_auditoria` como fase futura e nunca saiu. Quem cancelou a venda de R$ 4.000? Quem mudou o preço? Com dinheiro fiado envolvido, é questão de tempo. | M | schema + services |
 | 8 | ~~**Cobrança de fiado é passiva**~~ ✅ **feito em 16/08/2026** | Agora há prazo padrão configurável, atrasados destacados e ordenados na tela, cobrança pronta no WhatsApp e alerta de vencido no painel. | M | `fiado` + `cobranca.js` |
 | 9 | ~~**Nenhum teste do que o usuário vê**~~ ✅ **feito em 16/08/2026** | As contas de `NovaVenda.jsx` saíram para `utils/calculoVenda.js` com 63 testes. O front passou de 59 para 191 testes. Renderização segue sem cobertura — decisão consciente, ver abaixo. | M | `calculoVenda.js` |
-| 10 | **Sem caminho para produção** | Sem migração de banco (`down -v` para mudar schema é inviável com dado real), sem backup, sem CI, sem plano de deploy. Pronto para demo, não para o primeiro cliente. | M–G | infra |
+| 10 | ~~**Sem caminho para produção**~~ 🟡 **parcial em 16/08/2026** | Migração e backup **feitos e testados**. O deploy em si (Neon + plataforma gerenciada) está documentado em `Prumo-Colocar-No-Ar.md`, aguardando decisão de hospedagem. | M–G | infra |
 
 ---
 
@@ -36,7 +36,25 @@ não esquecimento.
 4. ~~**#9** e **#8**~~ ✅ **concluídos em 16/08/2026** (ver as duas seções finais).
 5. **#10** — sem migração, todo o resto vira retrabalho no dia que existir dado real.
 
-**Restam:** #10 (produção), #6 (internet caindo), #7 (auditoria), #4 (validação de entrada).
+**Restam:** #10 (só o deploy — migração e backup feitos), #6 (internet caindo), #7 (auditoria), #4 (validação de entrada).
+
+---
+
+## Migração e backup (16/08/2026) — item #10, primeira metade
+
+**O que travava:** `docs/schema.sql` só roda na primeira subida do volume. Alterar tabela exigia `docker compose down -v` — apagar o banco. Isso já tinha custado duas decisões: o vencimento do fiado virou variável de ambiente em vez de coluna, e a tela de configuração da loja não foi feita.
+
+**Migrações** (`BackEnd/migracoes/`, sem dependência nova): arquivos `.sql` numerados, aplicados no boot da API, uma vez cada. Cada uma roda em transação, e o registro acontece na mesma transação — separados, uma queda no meio deixaria a migração aplicada e não registrada. Um advisory lock impede duas instâncias migrando juntas. Migração que falha derruba o boot: melhor o erro aparecer no deploy que no meio de uma venda.
+
+A `002` já pagou a primeira dívida: `venda.vence_em` existe. Anulável de propósito — NULL significa "usa o prazo padrão da loja", então o comportamento atual segue idêntico e as vendas antigas continuam válidas sem backfill inventado.
+
+**Backup** (`scripts/backup-docker.sh`): dump `.sql` completo, mantendo os 7 mais recentes, fora do Git. Formato texto e não binário de propósito — um `.sql` pode ser lido e restaurado por qualquer ferramenta na hora do aperto; o dump binário exige exatamente o `pg_restore` da versão certa.
+
+Descoberta durante o teste: **`pg_dump` não existe no container da API** (`node:22-alpine`). Quem tem é o container do banco, e o script passou a usá-lo.
+
+**Verificação — o teste que importava:** backup gerado (46 KB), `DELETE` em todas as vendas, itens e pagamentos, restauração, **16 vendas, 18 itens, 2 pagamentos e 3 clientes de volta**, com o controle de migrações preservado. As duas migrações rodaram no banco existente sem apagar nada. 165/165 no Zé e 191/191 no front depois de tudo.
+
+**O que falta do #10:** o deploy. Documentado em `docs/Prumo-Colocar-No-Ar.md` com o caminho que o Benedito considerou (Neon + plataforma gerenciada), incluindo os segredos que precisam ser trocados (`JWT_*` e `ADMIN_SENHA` estão em texto no compose), o CORS que hoje é `origin: true`, e a questão de como o front alcança a API em produção. Não executado porque envolve custo mensal e decisão de hospedagem.
 
 ---
 

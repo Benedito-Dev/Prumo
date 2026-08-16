@@ -18,3 +18,11 @@ npm-debug.log*
 Thumbs.db
 .vscode/*
 !.vscode/extensions.json
+
+# Backups do banco — são DADOS REAIS de venda e cliente.
+# Versionar isto colocaria o histórico do negócio (e telefones de cliente)
+# num repositório que pode virar público.
+backups/
+*.sql.gz
+!docs/schema.sql
+!BackEnd/migracoes/*.sql

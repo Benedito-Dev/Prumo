@@ -18,7 +18,16 @@ Commits: `tipo(escopo): descrição em minúsculas`, sem acentos no assunto (`fe
 docker compose up            # db (5433) + api (3000) + web (5173)
 ```
 
-O schema (`docs/schema.sql`) roda sozinho na **primeira** inicialização do volume. Alterou o schema? `docker compose down -v` para recriar — não há ferramenta de migração.
+O schema (`docs/schema.sql`) roda sozinho na **primeira** inicialização do volume. Depois disso, **toda mudança de schema entra como migração** (`BackEnd/migracoes/NNN-descricao.sql`), aplicada no boot da API. Nunca mais `docker compose down -v` para alterar tabela — isso apagaria o banco.
+
+```bash
+npm run migrar:status --prefix BackEnd   # o que já foi aplicado
+npm run migrar --prefix BackEnd          # aplica o pendente (a API já faz no boot)
+bash scripts/backup-docker.sh            # backup do banco local
+bash scripts/restaurar-docker.sh <arq> --sim
+```
+
+Regras: **migração aplicada nunca é editada** (bancos divergiriam em silêncio — corrija com uma migração nova), e `docs/schema.sql` continua sendo o retrato para quem cria banco do zero, então mantenha os dois em dia.
 
 O admin inicial é criado no boot **só se não houver nenhum usuário** (`ADMIN_EMAIL`/`ADMIN_SENHA`).
 

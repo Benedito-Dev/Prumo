@@ -12,6 +12,7 @@ import {
   montarPayload,
   adicionarItem,
 } from '../utils/calculoVenda';
+import * as rascunho from '../utils/rascunhoVenda';
 
 const PAGAMENTOS = [
   { id: 'dinheiro', rotulo: 'Dinheiro' },
@@ -40,6 +41,61 @@ export default function NovaVenda() {
   const [descontoInput, setDescontoInput] = useState('');
   // Dívida do cliente escolhido — alimenta o aviso de fiado em aberto.
   const [divida, setDivida] = useState(null);
+  // Rascunho encontrado ao abrir a tela (venda interrompida por queda de
+  // internet, aba fechada, PC reiniciado). Fica em espera até a pessoa
+  // decidir: restaurar não pode acontecer sozinho, senão ela começa uma
+  // venda nova e encontra itens que não colocou.
+  const [rascunhoAchado, setRascunhoAchado] = useState(null);
+  const [semConexao, setSemConexao] = useState(false);
+
+  // Ao abrir: procura venda interrompida. Não restaura sozinho — só
+  // oferece. Numa correção de venda o molde já preenche a tela, então
+  // nem pergunta.
+  useEffect(() => {
+    if (correcao) return;
+    const achado = rascunho.carregar();
+    if (achado) setRascunhoAchado(achado);
+  }, [correcao]);
+
+  // Salva a cada mudança. É barato (localStorage é síncrono e local) e
+  // cobre o caso real: a queda não avisa antes de acontecer.
+  //
+  // `vendaSalva` sai fora: depois de gravada, a venda não é mais rascunho.
+  useEffect(() => {
+    if (vendaSalva || rascunhoAchado) return;
+    rascunho.salvar({ cliente, itens, pagamento, descontoInput, tipoDesconto });
+  }, [cliente, itens, pagamento, descontoInput, tipoDesconto, vendaSalva, rascunhoAchado]);
+
+  // O navegador avisa quando a conexão volta ou cai. É mais confiável que
+  // adivinhar pelo erro da requisição, e permite tirar o aviso da tela
+  // sozinho quando a internet volta.
+  useEffect(() => {
+    const online = () => setSemConexao(false);
+    const offline = () => setSemConexao(true);
+    window.addEventListener('online', online);
+    window.addEventListener('offline', offline);
+    // Estado inicial: a tela pode abrir já sem conexão.
+    if (navigator.onLine === false) setSemConexao(true);
+    return () => {
+      window.removeEventListener('online', online);
+      window.removeEventListener('offline', offline);
+    };
+  }, []);
+
+  function restaurarRascunho() {
+    const r = rascunhoAchado;
+    setCliente(r.cliente ?? null);
+    setItens(r.itens ?? []);
+    setPagamento(r.pagamento ?? 'dinheiro');
+    setDescontoInput(r.descontoInput ?? '');
+    setTipoDesconto(r.tipoDesconto ?? 'valor');
+    setRascunhoAchado(null);
+  }
+
+  function descartarRascunho() {
+    rascunho.limpar();
+    setRascunhoAchado(null);
+  }
 
   // Correção: preenche a tela com o molde da venda cancelada.
   //
@@ -156,9 +212,17 @@ export default function NovaVenda() {
       const venda = await vendasService.criarVenda(
         montarPayload({ cliente, itens, pagamento, descontoInput, tipoDesconto })
       );
+      // Gravou no servidor: o rascunho cumpriu o papel e sai de cena.
+      // Mantê-lo faria a próxima venda começar com os itens desta.
+      rascunho.limpar();
       setVendaSalva(venda); // mostra a confirmação
     } catch (e) {
-      setErro(e.message || 'Falha ao salvar a venda.');
+      // Distingue "sem internet" de "o sistema recusou": a primeira pede
+      // tentar de novo, a segunda pede corrigir algo. E o rascunho
+      // continua salvo — a mensagem diz isso, para a pessoa não achar que
+      // perdeu o trabalho.
+      setErro(rascunho.mensagemDeFalha(e));
+      if (rascunho.ehFalhaDeRede(e)) setSemConexao(true);
     } finally {
       setSalvando(false);
     }
@@ -166,6 +230,9 @@ export default function NovaVenda() {
 
   // reinicia a tela para uma nova venda
   function novaVenda() {
+    // A venda anterior já foi gravada; o rascunho dela não pode
+    // reaparecer na próxima abertura da tela.
+    rascunho.limpar();
     setCliente(null);
     setItens([]);
     setPagamento('dinheiro');
@@ -231,6 +298,52 @@ export default function NovaVenda() {
         </button>
       }
     >
+      {/* Venda interrompida. Pergunta em vez de restaurar sozinho: quem
+          abriu a tela para vender de novo estranharia encontrar itens que
+          não colocou. */}
+      {rascunhoAchado && (
+        <div className="max-w-[1280px] mx-auto mb-4 rounded-p border border-trena/40 bg-trena/5 px-4 py-3">
+          <p className="text-[13.5px] font-semibold text-grafite">
+            Você tinha uma venda em andamento
+          </p>
+          <p className="text-[12.5px] text-grafite-medio mt-0.5">
+            {rascunhoAchado.itens.length} item(ns)
+            {rascunhoAchado.cliente?.nome ? ` · ${rascunhoAchado.cliente.nome}` : ''}
+            {' · guardada '}
+            {rascunho.descreverIdade(rascunhoAchado.salvo_em)}.
+          </p>
+          <div className="flex gap-2 mt-2.5">
+            <button
+              onClick={restaurarRascunho}
+              className="h-11 px-4 rounded-p bg-trena hover:bg-trena-escuro text-white text-[13.5px] font-bold"
+            >
+              Continuar essa venda
+            </button>
+            <button
+              onClick={descartarRascunho}
+              className="h-11 px-4 rounded-p border border-linha text-[13px] font-semibold text-grafite-medio hover:text-grafite"
+            >
+              Começar do zero
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Sem conexão. O navegador avisa quando cai e quando volta, então
+          este aviso some sozinho — a pessoa não precisa recarregar para
+          descobrir que já dá para salvar. */}
+      {semConexao && (
+        <div className="max-w-[1280px] mx-auto mb-4 rounded-p border border-prumo/40 bg-prumo/5 px-4 py-3">
+          <p className="text-[13.5px] font-semibold text-prumo">
+            Sem conexão com o sistema
+          </p>
+          <p className="text-[12.5px] text-grafite-medio mt-0.5">
+            Pode continuar lançando: o que você digitar fica guardado aqui e é
+            só tocar em concluir quando a internet voltar.
+          </p>
+        </div>
+      )}
+
       {/* Correção em andamento. A venda antiga JÁ foi cancelada quando
           esta tela abriu — dizer isso evita que a pessoa saia daqui
           achando que a original continua valendo. */}

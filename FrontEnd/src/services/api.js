@@ -45,11 +45,26 @@ async function request(caminho, opcoes = {}, jaRenovou = false) {
   };
   if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
 
-  const resposta = await fetch(`${BASE}${caminho}`, {
-    ...opcoes,
-    headers,
-    credentials: 'include',
-  });
+  let resposta;
+  try {
+    resposta = await fetch(`${BASE}${caminho}`, {
+      ...opcoes,
+      headers,
+      credentials: 'include',
+    });
+  } catch (erro) {
+    // O fetch lança TypeError("Failed to fetch") quando não alcança o
+    // servidor — e era esse texto, em inglês, que chegava à tela do
+    // vendedor. A causa quase sempre é a internet do depósito, não um
+    // defeito do sistema.
+    //
+    // `causa` preserva o erro original para quem precisar distingui-lo
+    // (NovaVenda usa para saber que a venda continua guardada).
+    const falha = new Error('Sem conexão com o sistema. Verifique a internet e tente de novo.');
+    falha.semConexao = true;
+    falha.causa = erro;
+    throw falha;
+  }
 
   // Access expirado: tenta renovar uma vez e repete
   if (resposta.status === 401 && !jaRenovou && !caminho.startsWith('/auth/')) {

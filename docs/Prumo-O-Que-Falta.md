@@ -20,7 +20,7 @@ não esquecimento.
 | 3 | ~~**Sem middleware global de erro e sem rate limit no login**~~ ✅ **feito em 15/08/2026** | Login limitado a 10 tentativas malsucedidas por IP/15 min; os 17 pontos que devolviam `detalhe: erro.message` agora logam no servidor e respondem só a mensagem amigável; `app.js` ganhou 404 em JSON e middleware de erro. | P | `app.js` |
 | 4 | ~~**Validação de entrada na borda**~~ ✅ **feito em 16/08/2026** | Era pior que o previsto: `quantidade: "abc"` **gravava venda com `valor_total = NaN`** e contaminava o faturamento. Corrigido com `config/validar.js` + 58 testes. | M | `config/validar.js` |
 | 5 | ~~**Editar venda lançada**~~ ✅ **feito em 16/08/2026** | Só existia criar e cancelar. Agora "Corrigir venda" cancela a original e reabre a tela preenchida — sem redigitar nada, e sem reescrever histórico. | M | `venda.service.js` |
-| 6 | **Funcionar com internet caindo** | Depósito tem Wi-Fi ruim. Se cai no meio da venda, perde tudo. Rascunho em `localStorage` + fila de reenvio salva o núcleo sem virar PWA completo. | M–G | `NovaVenda.jsx` |
+| 6 | ~~**Funcionar com internet caindo**~~ ✅ **feito em 16/08/2026** | A venda em andamento fica guardada no navegador e é oferecida de volta ao reabrir. Aviso em português no lugar de "Failed to fetch". Fila de reenvio automático ficou de fora — risco de venda duplicada. | M–G | `rascunhoVenda.js` |
 | 7 | ~~**Log de auditoria**~~ ✅ **feito em 16/08/2026** | Produto e cliente passaram a registrar quem fez, o quê e o que mudou, com tela de histórico para o dono. Venda e fiado ficaram de fora: já têm autoria própria. | M | `auditoria/` |
 | 8 | ~~**Cobrança de fiado é passiva**~~ ✅ **feito em 16/08/2026** | Agora há prazo padrão configurável, atrasados destacados e ordenados na tela, cobrança pronta no WhatsApp e alerta de vencido no painel. | M | `fiado` + `cobranca.js` |
 | 9 | ~~**Nenhum teste do que o usuário vê**~~ ✅ **feito em 16/08/2026** | As contas de `NovaVenda.jsx` saíram para `utils/calculoVenda.js` com 63 testes. O front passou de 59 para 191 testes. Renderização segue sem cobertura — decisão consciente, ver abaixo. | M | `calculoVenda.js` |
@@ -36,7 +36,26 @@ não esquecimento.
 4. ~~**#9** e **#8**~~ ✅ **concluídos em 16/08/2026** (ver as duas seções finais).
 5. **#10** — sem migração, todo o resto vira retrabalho no dia que existir dado real.
 
-**Restam:** #10 (só o deploy — migração e backup feitos) e #6 (internet caindo).
+**Resta:** #10 — só o deploy. Migração e backup estão feitos e testados; falta a decisão de hospedagem e trocar os segredos (ver `Prumo-Colocar-No-Ar.md`).
+
+---
+
+## Venda sobrevive à queda de internet (16/08/2026) — item #6
+
+**O que escolhemos NÃO fazer:** fila que reenvia sozinha. Ela criaria risco de **venda duplicada** — a requisição pode ter chegado ao servidor antes da queda — e de venda gravada sem ninguém olhando. O remédio seria pior que a doença.
+
+**O desenho:** a venda em andamento é salva no navegador a cada mudança. Se a internet cai, um aviso explica o que houve e diz que nada se perdeu. Ao reabrir a tela, o sistema **oferece** a venda de volta em vez de restaurá-la sozinho.
+
+Também corrigimos um vazamento que ninguém tinha notado: quando a rede caía, a tela mostrava **"Failed to fetch"** — texto em inglês do navegador, no meio do balcão. Agora `services/api.js` traduz isso para "Sem conexão com o sistema", e o erro carrega uma flag que distingue falha de rede de erro de regra de negócio.
+
+**Decisões que valem registrar:**
+
+- `localStorage` **pode falhar** (modo privado, cota cheia). Todo acesso é protegido: rascunho é rede de segurança, não requisito, e um erro ali não pode derrubar a venda. Há teste com storage quebrado provando isso.
+- **Validade de 30 minutos** — rascunho de ontem confundiria mais que ajudaria.
+- **Não restaura sozinho:** quem abre a tela para vender estranharia encontrar itens que não colocou.
+- O aviso de "sem conexão" some sozinho quando a internet volta (eventos `online`/`offline`), sem recarregar.
+
+**Verificação:** 42/42 na suíte, e o ciclo inteiro no navegador real — venda lançada, rede derrubada, aviso correto, página recarregada do zero, venda oferecida de volta, restaurada e gravada, rascunho limpo no fim.
 
 ---
 

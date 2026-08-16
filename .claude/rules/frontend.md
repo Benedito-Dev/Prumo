@@ -108,6 +108,26 @@ Quatro módulos sem React, sem DOM e sem rede, cada um com suíte em Node puro (
 - `emReais` espelha o `emReais` do backend. Se os dois arredondarem diferente, a tela mostra um total e o banco grava outro.
 - `troco` é `null` enquanto o campo está vazio — sem isso a tela mostrava "Falta R$ 300,00" antes de a pessoa contar o dinheiro.
 
+## Venda sobrevive à queda de internet
+
+`utils/rascunhoVenda.js` guarda a venda em andamento no `localStorage` a cada mudança. Depósito tem Wi-Fi ruim e PC que reinicia; sem isso, a queda no meio de uma venda de 12 itens faz o vendedor recomeçar do zero com o cliente na frente dele.
+
+**O que NÃO foi feito, conscientemente:** fila que reenvia sozinha. Ela criaria risco de venda duplicada (a requisição pode ter chegado ao servidor antes da queda) e de venda gravada sem ninguém olhando. O desenho é: guarda, avisa, e a pessoa toca em salvar de novo.
+
+Decisões que sustentam isso:
+
+- **`localStorage` pode falhar** (modo privado do Safari, cota cheia). Todo acesso passa por try/catch e devolve `null`/`false` em vez de lançar — rascunho é rede de segurança, não requisito, e um throw ali derrubaria a tela de venda.
+- **Não restaura sozinho.** Oferece: "Você tinha uma venda em andamento · Continuar / Começar do zero". Restaurar em silêncio faria quem abriu a tela para vender encontrar itens que não colocou.
+- **Validade de 30 minutos.** Rascunho de ontem só confundiria: preço mudou, produto pode ter sido desativado, o cliente foi embora.
+- **Venda sem item não é guardada** — não é trabalho perdido.
+- O rascunho é limpo ao gravar a venda e em "Nova venda", senão a próxima começaria com os itens da anterior.
+
+`services/api.js` traduz falha de rede: o `fetch` lança `TypeError("Failed to fetch")` quando não alcança o servidor, e era **esse texto em inglês** que chegava à tela do vendedor. Agora vira "Sem conexão com o sistema…" com a flag `semConexao` no erro, que `ehFalhaDeRede()` reconhece para distinguir de erro de regra de negócio.
+
+`NovaVenda` escuta os eventos `online`/`offline` do navegador — o aviso aparece e some sozinho, sem a pessoa precisar recarregar para descobrir que já dá para salvar.
+
+Suíte: `node FrontEnd/src/utils/rascunhoVenda.test.mjs` (42 testes, com dublê de `localStorage`, inclusive um que falha).
+
 ## Recibo da venda
 
 `utils/recibo.js` é **módulo puro** (sem React, sem DOM, sem rede) — como o corretor de ditado, e pelo mesmo motivo: dá para testá-lo em Node sem navegador nem impressora. Rode `node FrontEnd/src/utils/recibo.test.mjs` (42 testes) ao mexer.

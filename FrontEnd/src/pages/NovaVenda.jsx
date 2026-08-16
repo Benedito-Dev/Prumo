@@ -6,6 +6,12 @@ import AcoesRecibo from '../components/AcoesRecibo';
 import { vendasService } from '../services/vendas';
 import { fiadosService } from '../services/fiados';
 import { moeda } from '../utils/formato';
+import {
+  calcularVenda,
+  validarVenda,
+  montarPayload,
+  adicionarItem,
+} from '../utils/calculoVenda';
 
 const PAGAMENTOS = [
   { id: 'dinheiro', rotulo: 'Dinheiro' },
@@ -116,39 +122,13 @@ export default function NovaVenda() {
     };
   }, [cliente?.id]);
 
-  const subtotal = itens.reduce((s, i) => s + Number(i.quantidade || 0) * Number(i.preco_unitario || 0), 0);
-  const qtdTotal = itens.reduce((s, i) => s + Number(i.quantidade || 0), 0);
-
-  // desconto em R$ (converte de % se for o caso), limitado ao subtotal
-  const descontoBruto =
-    tipoDesconto === 'percentual'
-      ? (subtotal * (Number(descontoInput) || 0)) / 100
-      : Number(descontoInput) || 0;
-  const desconto = Math.min(Math.max(descontoBruto, 0), subtotal);
-  const total = subtotal - desconto;
-  // troco (só faz sentido no dinheiro): recebido − total
-  const troco = Number(recebido) - total;
+  // As contas moram em utils/calculoVenda.js — módulo puro, com suíte
+  // própria (calculoVenda.test.mjs). Aqui a tela só consome o resultado.
+  const { subtotal, desconto, total, quantidadeTotal: qtdTotal, troco } =
+    calcularVenda({ itens, descontoInput, tipoDesconto, recebido });
 
   function adicionarProduto(p) {
-    // se já existe, incrementa; senão adiciona
-    setItens((atual) => {
-      const idx = atual.findIndex((i) => i.produto_id === p.id);
-      if (idx >= 0) {
-        const copia = [...atual];
-        copia[idx] = { ...copia[idx], quantidade: Number(copia[idx].quantidade) + 1 };
-        return copia;
-      }
-      return [
-        ...atual,
-        {
-          produto_id: p.id,
-          nome: p.nome,
-          unidade: p.unidade,
-          quantidade: 1,
-          preco_unitario: Number(p.preco_venda),
-        },
-      ];
-    });
+    setItens((atual) => adicionarItem(atual, p));
   }
 
   function atualizarItem(idx, campo, valor) {
@@ -165,28 +145,17 @@ export default function NovaVenda() {
 
   async function salvar() {
     setErro('');
-    if (itens.length === 0) {
-      setErro('Adicione ao menos um item.');
+    const problema = validarVenda({ itens });
+    if (problema) {
+      setErro(problema);
       return;
-    }
-    for (const i of itens) {
-      if (Number(i.quantidade) <= 0) return setErro('Quantidade deve ser maior que zero.');
-      if (Number(i.preco_unitario) < 0) return setErro('Preço não pode ser negativo.');
     }
 
     setSalvando(true);
     try {
-      // Quem vendeu sai do token no back — não se manda usuario_id daqui.
-      const venda = await vendasService.criarVenda({
-        cliente_id: cliente?.id ?? null,
-        forma_pagamento: pagamento,
-        desconto: Number(desconto.toFixed(2)),
-        itens: itens.map((i) => ({
-          produto_id: i.produto_id,
-          quantidade: Number(i.quantidade),
-          preco_unitario: Number(i.preco_unitario),
-        })),
-      });
+      const venda = await vendasService.criarVenda(
+        montarPayload({ cliente, itens, pagamento, descontoInput, tipoDesconto })
+      );
       setVendaSalva(venda); // mostra a confirmação
     } catch (e) {
       setErro(e.message || 'Falha ao salvar a venda.');
@@ -484,8 +453,10 @@ export default function NovaVenda() {
                     </button>
                   ))}
                 </div>
-                {/* troco calculado */}
-                {recebido !== '' && (
+                {/* Troco calculado. `troco` é null enquanto ninguém
+                    digitou — sem isso a tela mostraria "Falta R$ 300,00"
+                    com o campo ainda em branco. */}
+                {troco !== null && (
                   <div
                     className={`flex items-center justify-between rounded-p px-3 py-2 ${
                       troco < 0 ? 'bg-prumo/10' : 'bg-nivel/10'

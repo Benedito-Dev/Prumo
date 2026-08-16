@@ -711,10 +711,56 @@ export const openapiSpec = {
         responses: { 200: ok(ref('Venda')), 404: erro('Não encontrada') },
       },
     },
+    '/vendas/{id}/corrigir': {
+      post: {
+        tags: ['Vendas'],
+        summary: 'Cancela a venda e devolve o molde para reabri-la preenchida',
+        description:
+          'Não é edição: `item_venda` continua congelado (RF12), a venda original fica no ' +
+          'histórico como cancelada e a versão corrigida entra como venda nova pelo POST ' +
+          '/vendas de sempre. Existe porque cancelar e redigitar tudo por causa de uma ' +
+          'quantidade errada deixa o sistema mais lento que o caderno de papel.\n\n' +
+          'O dono corrige qualquer venda; o vendedor só as dele e só no mesmo dia do ' +
+          'calendário — venda de outro dia já entrou em faturamento que o dono pode ter ' +
+          'conferido. Venda com pagamento de fiado recebido não pode ser corrigida antes ' +
+          'de o valor ser devolvido.',
+        parameters: [paramId],
+        responses: {
+          200: ok({
+            type: 'object',
+            properties: {
+              cancelada: { type: 'string', format: 'uuid', description: 'id da venda cancelada' },
+              molde: {
+                type: 'object',
+                description: 'dados para pré-preencher a tela de Nova Venda',
+                properties: {
+                  cliente_id: { type: 'string', format: 'uuid', nullable: true },
+                  cliente_nome: { type: 'string', nullable: true },
+                  cliente_telefone: { type: 'string', nullable: true },
+                  forma_pagamento: { type: 'string' },
+                  desconto: { type: 'number' },
+                  itens: { type: 'array', items: { type: 'object' } },
+                },
+              },
+            },
+          }, 'Venda cancelada; molde pronto'),
+          404: erro('Não encontrada (ou é de outro vendedor)'),
+          409: erro('Já cancelada, de outro dia, ou com pagamento recebido'),
+        },
+      },
+    },
     '/vendas/{id}/cancelar': {
       patch: {
         tags: ['Vendas'],
         summary: 'Cancela uma venda (soft delete, RF14)',
+        description:
+          SO_DONO +
+          ' A tool equivalente do Zé sempre foi ["dono"]; esta rota estava aberta. ' +
+          'O vendedor acerta erro do dia por POST /vendas/{id}/corrigir.\n\n' +
+          'Venda fiado com pagamento já recebido é recusada: as consultas de fiado só ' +
+          'enxergam vendas concluídas, então a dívida sumiria da lista enquanto os ' +
+          'registros em pagamento_fiado continuariam apontando para ela — o dinheiro que ' +
+          'o cliente entregou viraria pagamento órfão.',
         parameters: [paramId],
         responses: {
           200: ok({
@@ -725,8 +771,9 @@ export const openapiSpec = {
               cancelada_em: { type: 'string', format: 'date-time' },
             },
           }),
+          403: erro('Só o dono'),
           404: erro('Não encontrada'),
-          409: erro('Já está cancelada'),
+          409: erro('Já está cancelada ou já teve pagamento recebido'),
         },
       },
     },

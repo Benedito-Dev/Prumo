@@ -100,6 +100,27 @@ Dois detalhes que existem por um motivo:
 
 O filtro de `listarVendas` vem do token no controller e **sobrescreve** o que veio na query — sem isso, bastaria mandar `?usuario_id=<id do colega>`.
 
+## Corrigir venda ≠ editar venda
+
+`POST /vendas/:id/corrigir` **cancela** a venda e devolve `{ cancelada, molde }`. A tela abre `Nova Venda` preenchida com o molde e a versão corrigida entra pelo `POST /vendas` de sempre.
+
+Nada é reescrito: `item_venda` continua congelado (RF12) e a original fica no histórico como cancelada. É o que concilia "o histórico é imutável" com "cancelar e redigitar tudo por uma quantidade errada deixa o sistema mais lento que o caderno".
+
+Regras em `exigirVendaCorrigivel`:
+- Dono corrige qualquer venda; vendedor só as dele e só no **mesmo dia do calendário** (não 24h — venda das 18h de ontem não é corrigível às 8h de hoje).
+- Venda de outro vendedor responde **404**, não 403, pela mesma razão de `buscarVenda`.
+- Venda já cancelada ou com pagamento de fiado recebido é recusada.
+
+O molde carrega `produto_id`, não só o nome: a tela remonta os itens contra o catálogo atual, então produto desativado desde a venda aparece como ausente em vez de ser revendido em silêncio. E carrega o `preco_unitario` praticado, não o de tabela — se houve negociação no balcão, é ela que está sendo corrigida.
+
+**`PATCH /vendas/:id/cancelar` agora é só do dono.** A tool `cancelar_venda` do Zé sempre foi `['dono']` e a rota REST estava aberta — mesma assimetria do painel. O vendedor acerta erro do dia por `/corrigir`.
+
+## Cancelar venda com fiado já pago é barrado
+
+`cancelarVenda` recusa quando existe qualquer linha em `pagamento_fiado` para aquela venda.
+
+Sem isso: as consultas de fiado só enxergam vendas `'concluida'`, então a dívida sumiria da lista enquanto os pagamentos continuariam gravados apontando para ela. O dinheiro que o cliente entregou viraria pagamento órfão — sem dívida correspondente, sem aparecer em lugar nenhum, e ninguém perceberia. Quem precisa desfazer devolve o valor primeiro.
+
 ## Fiado: o mapa é do dono, o aviso é do balcão
 
 O vendedor não tem a tela de Fiados. A dívida aparece para ele **dentro de Nova Venda**, quando escolhe o cliente: `GET /fiados/cliente/:id` devolve total, número de dívidas e a data da mais antiga, e `POST /fiados/cliente/:id/pagar` abate em cascata.

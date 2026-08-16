@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Receipt, X, Ban, Search } from 'lucide-react';
+import { Plus, Receipt, X, Ban, Search, Pencil } from 'lucide-react';
 import LayoutApp from '../components/LayoutApp';
 import Seletor from '../components/Seletor';
 import AcoesRecibo from '../components/AcoesRecibo';
@@ -279,6 +279,8 @@ export default function Vendas() {
       {detalhe && (
         <ModalDetalheVenda
           id={detalhe}
+          ehDono={ehDono}
+          usuarioId={usuario?.id}
           onFechar={() => setDetalhe(null)}
           onCancelada={() => {
             setDetalhe(null);
@@ -304,11 +306,14 @@ function KpiV({ rotulo, valor, destaque = false }) {
 }
 
 // ---------- Modal de detalhe da venda ----------
-function ModalDetalheVenda({ id, onFechar, onCancelada }) {
+function ModalDetalheVenda({ id, onFechar, onCancelada, ehDono, usuarioId }) {
+  const navigate = useNavigate();
   const [venda, setVenda] = useState(null);
   const [carregando, setCarregando] = useState(true);
   const [confirmando, setConfirmando] = useState(false);
   const [cancelando, setCancelando] = useState(false);
+  const [corrigindo, setCorrigindo] = useState(false);
+  const [erroAcao, setErroAcao] = useState('');
 
   useEffect(() => {
     let ativo = true;
@@ -323,17 +328,46 @@ function ModalDetalheVenda({ id, onFechar, onCancelada }) {
 
   async function cancelar() {
     setCancelando(true);
+    setErroAcao('');
     try {
       await vendasService.cancelar(id);
       onCancelada();
-    } catch {
+    } catch (e) {
+      // A mensagem importa: cancelar pode ser recusado por papel ou porque
+      // a venda já teve pagamento recebido. Engolir o erro deixaria o
+      // botão parecendo quebrado.
+      setErroAcao(e.message);
       setCancelando(false);
+      setConfirmando(false);
+    }
+  }
+
+  // Cancela a venda e abre Nova Venda com tudo preenchido.
+  async function corrigir() {
+    setCorrigindo(true);
+    setErroAcao('');
+    try {
+      const correcao = await vendasService.corrigir(id);
+      navigate('/vendas/nova', { state: { correcao } });
+    } catch (e) {
+      setErroAcao(e.message);
+      setCorrigindo(false);
     }
   }
 
   const subtotal = venda?.itens?.reduce((s, i) => s + Number(i.subtotal), 0) || 0;
   const desconto = Number(venda?.desconto || 0);
   const cancelada = venda?.status === 'cancelada';
+
+  // Espelha a regra do back (exigirVendaCorrigivel): o dono corrige
+  // qualquer venda; o vendedor só as dele e só no mesmo dia. Aqui é para
+  // não oferecer um botão que vai recusar — quem decide de verdade é o
+  // servidor.
+  const ehMinha = venda?.usuario_id === usuarioId;
+  const doMesmoDia =
+    venda &&
+    new Date(venda.vendida_em).toDateString() === new Date().toDateString();
+  const podeCorrigir = !cancelada && (ehDono || (ehMinha && doMesmoDia));
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4 overflow-y-auto" onClick={onFechar}>
@@ -422,8 +456,27 @@ function ModalDetalheVenda({ id, onFechar, onCancelada }) {
               <AcoesRecibo venda={venda} telefoneCliente={venda.cliente_telefone} compacto />
             )}
 
-            {/* ação cancelar (só se concluída) */}
-            {!cancelada &&
+            {/* Corrigir: cancela esta e reabre preenchida. Vem antes de
+                cancelar porque é a ação que o balcão realmente usa —
+                cancelar sem substituir é excepcional. */}
+            {podeCorrigir && (
+              <button
+                onClick={corrigir}
+                disabled={corrigindo}
+                className="flex items-center justify-center gap-2 py-2.5 rounded-p border border-linha text-[13px] font-bold hover:bg-concreto disabled:opacity-60"
+              >
+                <Pencil size={15} />
+                {corrigindo ? 'Abrindo…' : 'Corrigir venda'}
+              </button>
+            )}
+
+            {erroAcao && (
+              <p className="text-[12.5px] text-prumo font-semibold">{erroAcao}</p>
+            )}
+
+            {/* Cancelar sem substituir é só do dono (o back recusa os
+                demais). Para o vendedor, o caminho é "Corrigir venda". */}
+            {!cancelada && ehDono &&
               (confirmando ? (
                 <div className="border-2 border-prumo/30 rounded-p p-3 bg-prumo/5">
                   <p className="text-[13px] font-semibold text-prumo mb-2">

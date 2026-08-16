@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, Search, Plus, Trash2, UserPlus, X, Check } from 'lucide-react';
 import LayoutApp from '../components/LayoutApp';
 import AcoesRecibo from '../components/AcoesRecibo';
@@ -16,6 +16,11 @@ const PAGAMENTOS = [
 
 export default function NovaVenda() {
   const navigate = useNavigate();
+  // Molde de uma venda que está sendo corrigida (veio de Vendas, via
+  // navigate state). Fica fora da URL de propósito: recarregar a página
+  // não deve reabrir uma correção que já foi salva.
+  const { state } = useLocation();
+  const correcao = state?.correcao || null;
 
   const [cliente, setCliente] = useState(null); // null = Consumidor
   const [itens, setItens] = useState([]); // { produto_id, nome, unidade, quantidade, preco_unitario }
@@ -29,6 +34,64 @@ export default function NovaVenda() {
   const [descontoInput, setDescontoInput] = useState('');
   // Dívida do cliente escolhido — alimenta o aviso de fiado em aberto.
   const [divida, setDivida] = useState(null);
+
+  // Correção: preenche a tela com o molde da venda cancelada.
+  //
+  // A unidade de cada item vem do catálogo ATUAL, não do molde — é o que
+  // faz um produto desativado desde a venda aparecer como problema aqui
+  // em vez de ser revendido em silêncio.
+  const [itensSumidos, setItensSumidos] = useState([]);
+  useEffect(() => {
+    if (!correcao) return;
+    const m = correcao.molde;
+
+    if (m.cliente_id) {
+      setCliente({
+        id: m.cliente_id,
+        nome: m.cliente_nome,
+        telefone: m.cliente_telefone,
+      });
+    }
+    setPagamento(m.forma_pagamento);
+    if (Number(m.desconto) > 0) {
+      setTipoDesconto('valor');
+      setDescontoInput(String(m.desconto));
+    }
+
+    let ativo = true;
+    vendasService
+      .buscarProdutos()
+      .then((catalogo) => {
+        if (!ativo) return;
+        const porId = new Map(catalogo.map((p) => [p.id, p]));
+        const encontrados = [];
+        const sumidos = [];
+        for (const item of m.itens) {
+          const atual = porId.get(item.produto_id);
+          if (!atual) {
+            sumidos.push(item.produto_nome);
+            continue;
+          }
+          encontrados.push({
+            produto_id: item.produto_id,
+            nome: atual.nome,
+            unidade: atual.unidade,
+            quantidade: item.quantidade,
+            // O preço praticado na venda original, não o de tabela: se
+            // houve negociação no balcão, ela é o que se está corrigindo.
+            preco_unitario: item.preco_unitario,
+          });
+        }
+        setItens(encontrados);
+        setItensSumidos(sumidos);
+      })
+      .catch(() => {
+        if (ativo) setErro('Não foi possível carregar os itens da venda.');
+      });
+    return () => {
+      ativo = false;
+    };
+  }, [correcao]);
 
   // Escolheu um cliente? consulta se ele tem fiado em aberto.
   // Falha em silêncio de propósito: não achar a dívida não pode impedir a
@@ -189,7 +252,7 @@ export default function NovaVenda() {
 
   return (
     <LayoutApp
-      titulo="Nova venda"
+      titulo={correcao ? 'Corrigir venda' : 'Nova venda'}
       acao={
         <button
           onClick={() => navigate('/')}
@@ -199,6 +262,26 @@ export default function NovaVenda() {
         </button>
       }
     >
+      {/* Correção em andamento. A venda antiga JÁ foi cancelada quando
+          esta tela abriu — dizer isso evita que a pessoa saia daqui
+          achando que a original continua valendo. */}
+      {correcao && (
+        <div className="max-w-[1280px] mx-auto mb-4 rounded-p border border-trena/40 bg-trena/5 px-4 py-3">
+          <p className="text-[13.5px] font-semibold text-grafite">
+            Corrigindo a venda {String(correcao.cancelada).slice(0, 8).toUpperCase()}
+          </p>
+          <p className="text-[12.5px] text-grafite-medio mt-0.5">
+            A venda anterior foi cancelada. Ajuste o que estava errado e salve —
+            isto entra como uma venda nova.
+          </p>
+          {itensSumidos.length > 0 && (
+            <p className="text-[12.5px] text-prumo font-semibold mt-1.5">
+              Fora do catálogo, não foram trazidos: {itensSumidos.join(', ')}.
+            </p>
+          )}
+        </div>
+      )}
+
       {/* pb-24 até lg: espaço para a barra fixa não cobrir o fim do resumo */}
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-4 pb-24 lg:pb-0 lg:h-full lg:min-h-[560px] max-w-[1280px] mx-auto">
         {/* ---- COLUNA ESQUERDA: cliente + itens ---- */}

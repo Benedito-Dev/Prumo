@@ -64,9 +64,35 @@ export async function criarVenda(req, res) {
   }
 }
 
+// POST /api/vendas/:id/corrigir
+//
+// Cancela a venda e devolve o molde para a tela reabri-la preenchida.
+// Não é edição: a venda original fica no histórico como cancelada e a
+// versão corrigida entra como venda nova, pelo mesmo caminho de sempre.
+// É o que mantém `item_venda` congelado (RF12) e ainda assim evita que o
+// vendedor redigite tudo por causa de uma quantidade errada.
+export async function corrigirVenda(req, res) {
+  try {
+    res.json(await vendas.prepararCorrecao(req.params.id, req.usuario));
+  } catch (erro) {
+    responderErro(res, erro, 'Falha ao preparar a correção');
+  }
+}
+
 // PATCH /api/vendas/:id/cancelar — soft delete (RF14), preserva o histórico.
+//
+// Cancelar tira dinheiro do faturamento e é cicatriz, não desfazer: a
+// tool equivalente do Zé sempre foi ['dono'], mas esta rota estava aberta
+// a qualquer vendedor — a mesma ação respondia diferente conforme o
+// caminho. O vendedor conserta erro do dia por /corrigir, que cancela e
+// reabre preenchido; cancelar sem substituir continua sendo do dono.
 export async function cancelarVenda(req, res) {
   try {
+    if (req.usuario.papel !== 'dono') {
+      return res.status(403).json({
+        erro: 'Só o dono cancela venda. Use "Corrigir venda" para acertar um erro.',
+      });
+    }
     res.json(await vendas.cancelarVenda(req.params.id));
   } catch (erro) {
     responderErro(res, erro, 'Falha ao cancelar venda');

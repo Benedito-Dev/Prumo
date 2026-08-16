@@ -241,7 +241,26 @@ export async function criarVenda({ cliente_id, usuario_id, forma_pagamento, iten
 // Soft delete (RF14): a venda não some, muda de status. Cancelar duas
 // vezes é barrado — o que torna a operação idempotente do ponto de
 // vista de quem confirma.
+//
+// Venda fiado com pagamento já recebido NÃO pode ser cancelada. As
+// consultas de fiado só enxergam vendas 'concluida', então a dívida
+// sumiria da lista enquanto os registros em pagamento_fiado continuariam
+// apontando para ela: o dinheiro que o cliente entregou viraria um
+// pagamento órfão, sem dívida correspondente, e ninguém perceberia.
+// Quem precisa desfazer isso primeiro devolve o dinheiro.
 export async function cancelarVenda(id) {
+  const recebido = await query(
+    `SELECT COALESCE(SUM(valor), 0) AS pago
+       FROM pagamento_fiado
+      WHERE venda_id = $1`,
+    [id]
+  );
+  if (Number(recebido.rows[0].pago) > 0) {
+    throw conflito(
+      'Esta venda já teve pagamento recebido. Devolva o valor ao cliente antes de cancelar.'
+    );
+  }
+
   const { rows, rowCount } = await query(
     `UPDATE venda
         SET status = 'cancelada', cancelada_em = NOW()
@@ -256,6 +275,86 @@ export async function cancelarVenda(id) {
     throw conflito('Venda já está cancelada');
   }
   return rows[0];
+}
+
+// Quem pode corrigir uma venda, e até quando.
+//
+// O dono corrige qualquer uma. O vendedor corrige só as dele e só no
+// mesmo dia: 99% dos erros aparecem na hora, com o cliente ainda no
+// balcão. Venda de ontem em diante já entrou em faturamento que o dono
+// pode ter conferido — refazê-la sem ele saber mudaria número fechado.
+//
+// Devolve a venda quando pode; lança ErroNegocio explicando quando não.
+export async function exigirVendaCorrigivel(id, usuario) {
+  const venda = await exigirVenda(id);
+
+  if (venda.status !== 'concluida') {
+    throw conflito('Esta venda já foi cancelada.');
+  }
+
+  const pago = await query(
+    'SELECT COALESCE(SUM(valor), 0) AS pago FROM pagamento_fiado WHERE venda_id = $1',
+    [id]
+  );
+  if (Number(pago.rows[0].pago) > 0) {
+    throw conflito(
+      'Esta venda já teve pagamento recebido. Devolva o valor ao cliente antes de corrigir.'
+    );
+  }
+
+  if (usuario.papel === 'dono') return venda;
+
+  if (venda.usuario_id !== usuario.id) {
+    // 404 e não 403: dizer "existe, mas não é sua" já confirmaria a venda
+    // a quem não deveria saber dela — mesma regra de buscarVenda.
+    throw naoEncontrado('Venda não encontrada');
+  }
+
+  // "Mesmo dia" é o dia do calendário, não 24 horas: uma venda das 18h de
+  // ontem não deve ser corrigível às 8h de hoje só porque cabe na janela.
+  const hoje = new Date();
+  const dataVenda = new Date(venda.vendida_em);
+  const mesmoDia =
+    hoje.getFullYear() === dataVenda.getFullYear() &&
+    hoje.getMonth() === dataVenda.getMonth() &&
+    hoje.getDate() === dataVenda.getDate();
+
+  if (!mesmoDia) {
+    throw conflito('Só o dono corrige venda de outro dia. Peça para ele.');
+  }
+
+  return venda;
+}
+
+// Cancela a venda e devolve os dados para reabri-la preenchida.
+//
+// Não edita nada: `item_venda` continua congelado (RF12) e a venda
+// original permanece no histórico como cancelada. Quem grava a versão
+// corrigida é o fluxo normal de criarVenda, o que mantém uma única porta
+// de entrada para venda no sistema.
+export async function prepararCorrecao(id, usuario) {
+  const venda = await exigirVendaCorrigivel(id, usuario);
+  await cancelarVenda(id);
+
+  return {
+    cancelada: venda.id,
+    // O molde carrega produto_id (não o nome): a tela remonta os itens a
+    // partir do catálogo atual, e um produto desativado desde a venda
+    // aparece como ausente em vez de ser revendido silenciosamente.
+    molde: {
+      cliente_id: venda.cliente_id,
+      cliente_nome: venda.cliente_nome,
+      cliente_telefone: venda.cliente_telefone,
+      forma_pagamento: venda.forma_pagamento,
+      desconto: Number(venda.desconto),
+      itens: (venda.itens || []).map((i) => ({
+        produto_id: i.produto_id,
+        produto_nome: i.produto_nome,
+        quantidade: Number(i.quantidade),
+        preco_unitario: Number(i.preco_unitario),
+      })),
+    },
+  };
 }
 
 // Vendas recentes de um cliente — como o Zé acha "a venda do Marcos de

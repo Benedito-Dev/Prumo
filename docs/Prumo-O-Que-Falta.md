@@ -19,7 +19,7 @@ não esquecimento.
 | 2 | ~~**`/api/painel/*` aberta a qualquer autenticado**~~ ✅ **feito em 15/08/2026** | Dívida já registrada no `CLAUDE.md`: o vendedor via faturamento, ticket médio e o ranking dos colegas. Agora os seis indicadores da loja são `requireDono`, e o vendedor tem `meu-resumo`/`minha-evolucao` + a tela `MeuPainel.jsx`. | P | `painel.routes.js` |
 | 3 | ~~**Sem middleware global de erro e sem rate limit no login**~~ ✅ **feito em 15/08/2026** | Login limitado a 10 tentativas malsucedidas por IP/15 min; os 17 pontos que devolviam `detalhe: erro.message` agora logam no servidor e respondem só a mensagem amigável; `app.js` ganhou 404 em JSON e middleware de erro. | P | `app.js` |
 | 4 | **Validação de entrada na borda** | Não há Zod/Joi; o service confia no shape do corpo. `quantidade: "abc"` chega ao SQL. Com dinheiro em `NUMERIC` e `Number()` manual, é fonte de bug silencioso. | M | `*/controller.js` |
-| 5 | **Editar venda lançada** | Só existe criar e cancelar. Errou a quantidade? Cancela e refaz tudo. No papel se risca e corrige — aqui fica mais lento que o caderno, o que a meta proíbe. | M | `venda.service.js` |
+| 5 | ~~**Editar venda lançada**~~ ✅ **feito em 16/08/2026** | Só existia criar e cancelar. Agora "Corrigir venda" cancela a original e reabre a tela preenchida — sem redigitar nada, e sem reescrever histórico. | M | `venda.service.js` |
 | 6 | **Funcionar com internet caindo** | Depósito tem Wi-Fi ruim. Se cai no meio da venda, perde tudo. Rascunho em `localStorage` + fila de reenvio salva o núcleo sem virar PWA completo. | M–G | `NovaVenda.jsx` |
 | 7 | **Log de auditoria** | O schema já prevê `log_auditoria` como fase futura e nunca saiu. Quem cancelou a venda de R$ 4.000? Quem mudou o preço? Com dinheiro fiado envolvido, é questão de tempo. | M | schema + services |
 | 8 | **Cobrança de fiado é passiva** | O módulo registra e consolida, mas ninguém avisa. Falta vencimento + lista de atrasados + botão de mensagem no WhatsApp. Fiado esquecido é prejuízo direto. | M | `fiado` |
@@ -32,9 +32,10 @@ não esquecimento.
 
 1. ~~**#2 + #3**~~ ✅ **concluído em 15/08/2026** (ver "Parte 1" abaixo).
 2. ~~**#1**~~ ✅ **concluído em 16/08/2026** (ver "Recibo" abaixo).
-3. **#10** — sem migração, todo o resto vira retrabalho no dia que existir dado real.
+3. ~~**#5**~~ ✅ **concluído em 16/08/2026** (ver "Corrigir venda" abaixo).
+4. **#10** — sem migração, todo o resto vira retrabalho no dia que existir dado real.
 
-Próximos candidatos: **#5** (corrigir venda lançada — hoje o sistema é mais lento que o papel para consertar um erro) e **#10**.
+Próximos candidatos: **#10** (produção), **#9** (testes de tela — `NovaVenda.jsx` já foi mexida três vezes esta semana sem rede) e **#6** (internet caindo).
 
 ---
 
@@ -82,3 +83,21 @@ Aparece em dois lugares: na **confirmação da venda** (com o cliente ainda no b
 **Verificação:** 42/42 na suíte do recibo (largura, contas, fiado, loja sem cadastro, links de WhatsApp, entrada malformada), 14/14 contra a API rodando — incluindo montar o recibo com dados vindos do banco e conferir o total, 165/165 na suíte do Zé, lint e build limpos.
 
 **Fica registrado:** não há tela para editar os dados da loja — hoje é variável de ambiente, e mudar exige reiniciar o container. Quando existir tela de configuração, `config/loja.js` vira o valor padrão dela.
+
+---
+
+## Corrigir venda (16/08/2026) — item #5
+
+**O caminho escolhido:** cancelar e reabrir preenchido, não editar. `POST /vendas/:id/corrigir` cancela a venda e devolve um molde; a tela abre `Nova Venda` já com cliente, itens, desconto e forma de pagamento. O vendedor ajusta o que errou e salva — a correção entra como venda nova, pelo `POST /vendas` de sempre.
+
+Isso concilia duas coisas que pareciam brigar: o `CLAUDE.md` manda o histórico ser imutável (`item_venda` congelado, RF12), e a meta dos 30 segundos proíbe que consertar um erro seja mais lento que riscar o caderno. Nada é reescrito; as duas versões existem, e o rastro sai de graça.
+
+**Regras:** o dono corrige qualquer venda; o vendedor só as dele e só no mesmo dia do calendário. Venda de outro vendedor responde 404 (não 403 — "existe, mas não é sua" já confirmaria a venda).
+
+**Dois problemas encontrados e corrigidos de passagem:**
+
+1. **Pagamento de fiado órfão.** Cancelar uma venda fiado que já recebeu pagamento fazia a dívida sumir da lista (as consultas de fiado só veem vendas `concluida`) enquanto os registros em `pagamento_fiado` continuavam apontando para ela. O dinheiro entregue pelo cliente sumia do sistema sem que ninguém notasse. Agora é recusado com a mensagem de devolver o valor antes. Isso existia independente da correção de venda — ficou mais provável de acontecer depois que o vendedor ganhou o botão de receber fiado na tela de venda.
+
+2. **`PATCH /vendas/:id/cancelar` estava aberta a qualquer vendedor**, enquanto a tool `cancelar_venda` do Zé sempre foi `['dono']` — a mesma assimetria do painel, em outro lugar. Agora é só do dono; o vendedor usa "Corrigir venda".
+
+**Verificação:** 25/25 contra a API rodando — caminho feliz com molde completo, item congelado da original intacto, corrigir duas vezes recusado, venda de outro vendedor, venda de outro dia, cancelar por papel, e o ciclo do fiado pago confirmando que a dívida continua íntegra depois das recusas. Mais 165/165 na suíte do Zé, lint e build limpos.

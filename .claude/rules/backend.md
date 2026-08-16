@@ -23,6 +23,32 @@ Um diretório por domínio em `src/`, cada um com `*.routes.js` → `*.controlle
 
 `src/docs/openapi.js` mantém a spec do Swagger (`/api/docs`) escrita à mão: ~990 linhas, 42 operações, e **hoje cobre 100% das rotas**. Não há geração automática — **rota nova sem entrada lá quebra essa cobertura.** Ao adicionar, siga o formato vizinho (`tags`, `summary`, `security`, exemplos de resposta).
 
+## Auditoria (`auditoria/auditoria.service.js`)
+
+Registra **produto e cliente** — as duas entidades que não tinham rastro. Venda e pagamento de fiado ficam de fora de propósito: já guardam `usuario_id` em coluna própria, e duplicar faria a tabela crescer a cada venda.
+
+**Registrar nunca derruba a operação.** `registrar()` engole o próprio erro e só grita no `console.error`: a escrita já aconteceu, e abortar por causa da anotação trocaria um problema pequeno (perdi uma linha de log) por um grande (o balcão parou).
+
+Ao escrever um service novo que mexe em cadastro:
+
+```js
+export async function algo(id, dados, usuario = null) {
+  const antes = await buscar(id);          // estado anterior, para o diff
+  const depois = /* UPDATE ... RETURNING */;
+  const alteracoes = calcularAlteracoes(antes, depois);
+  if (alteracoes) await registrar({ usuario, acao: ACOES.EDITAR, ... });
+}
+```
+
+- `usuario` é o **último parâmetro e opcional**, para não quebrar chamadas existentes. Mas quem não passa fica anônimo no log — **controllers e tools do Zé precisam repassar**. As tools recebem `usuario` como segundo argumento de `executar(args, usuario)`; o contrato já previa isso.
+- `calcularAlteracoes` compara o que o **banco** gravou antes/depois, não o que foi pedido: o UPDATE aplica defaults e trunca. E compara via `String()` porque `NUMERIC` volta como string — `"45.00"` vs `45` marcaria mudança onde não houve.
+- **Salvar sem mudar nada não vira linha**, senão o log enche de ruído.
+- Ativar/desativar produto tem ação própria (`desativar`/`reativar`), não vira "editar" com um booleano no meio.
+- `usuario_nome` e `entidade_nome` são **cópias congeladas** (mesmo princípio de `item_venda`): o log precisa continuar legível depois que o produto for apagado ou o usuário renomeado.
+- A FK do usuário é `ON DELETE SET NULL`, nunca CASCADE — apagar alguém não pode apagar o que essa pessoa fez.
+
+`GET /api/auditoria` é `requireDono`.
+
 ## Validação de entrada (`config/validar.js`)
 
 **`Number(x)` não valida nada.** Ele devolve `NaN` para lixo, `Infinity` para `"1e400"`, e `0` para string vazia, `null`, `[]` e `false`. Foi assim que `quantidade: "abc"` gravou venda: a checagem era `Number(q) <= 0`, e **NaN não é menor nem maior que zero**, então o `if` não disparava.

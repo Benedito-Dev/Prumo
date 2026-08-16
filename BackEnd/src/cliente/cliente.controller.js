@@ -55,7 +55,7 @@ export async function buscarCliente(req, res) {
 // POST /api/clientes
 export async function criarCliente(req, res) {
   try {
-    res.status(201).json(await clientes.criarCliente(req.body));
+    res.status(201).json(await clientes.criarCliente(req.body, req.usuario));
   } catch (erro) {
     responderErro(res, erro, 'Falha ao criar cliente');
   }
@@ -64,7 +64,7 @@ export async function criarCliente(req, res) {
 // PUT /api/clientes/:id
 export async function atualizarCliente(req, res) {
   try {
-    res.json(await clientes.atualizarCliente(req.params.id, req.body));
+    res.json(await clientes.atualizarCliente(req.params.id, req.body, req.usuario));
   } catch (erro) {
     responderErro(res, erro, 'Falha ao atualizar cliente');
   }
@@ -73,7 +73,7 @@ export async function atualizarCliente(req, res) {
 // DELETE /api/clientes/:id
 export async function removerCliente(req, res) {
   try {
-    await clientes.removerCliente(req.params.id);
+    await clientes.removerCliente(req.params.id, req.usuario);
     res.status(204).send();
   } catch (erro) {
     responderErro(res, erro, 'Falha ao remover cliente');

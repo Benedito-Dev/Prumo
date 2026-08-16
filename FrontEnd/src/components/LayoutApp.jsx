@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Receipt, Users, Package, NotebookPen,
-  LogOut, Sun, Moon, UserCog, KeyRound, Sparkles, Menu, X,
+  LogOut, Sun, Moon, UserCog, KeyRound, Sparkles, Menu, X, History,
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { useTheme } from '../theme/ThemeContext';
@@ -146,13 +146,24 @@ export default function LayoutApp({ titulo, periodo, acao, children }) {
             </div>
           )}
           {ehDono && (
-            <NavLink
-              to="/usuarios"
-              className={({ isActive }) => `w-full ${itemNav(isActive, false)}`}
-            >
-              <UserCog size={18} strokeWidth={2} className="shrink-0" />
-              Usuários
-            </NavLink>
+            <>
+              <NavLink
+                to="/usuarios"
+                className={({ isActive }) => `w-full ${itemNav(isActive, false)}`}
+              >
+                <UserCog size={18} strokeWidth={2} className="shrink-0" />
+                Usuários
+              </NavLink>
+              {/* Fica junto de Usuários porque é a mesma pergunta vista de
+                  outro ângulo: quem são as pessoas, e o que elas fizeram. */}
+              <NavLink
+                to="/historico"
+                className={({ isActive }) => `w-full ${itemNav(isActive, false)}`}
+              >
+                <History size={18} strokeWidth={2} className="shrink-0" />
+                Histórico
+              </NavLink>
+            </>
           )}
           <button
             onClick={() => setTrocandoSenha(true)}

@@ -11,6 +11,7 @@ import Fiados from './pages/Fiados';
 import Assistente from './pages/Assistente';
 import Usuarios from './pages/Usuarios';
 import UsuarioDetalhe from './pages/UsuarioDetalhe';
+import Historico from './pages/Historico';
 import RotaProtegida from './auth/RotaProtegida';
 import { useAuth } from './auth/AuthContext';
 
@@ -109,6 +110,16 @@ export default function App() {
         element={
           <RotaProtegida soDono>
             <UsuarioDetalhe />
+          </RotaProtegida>
+        }
+      />
+      {/* O histórico mostra o que cada pessoa fez — informação de quem
+          administra, não do balcão. */}
+      <Route
+        path="/historico"
+        element={
+          <RotaProtegida soDono>
+            <Historico />
           </RotaProtegida>
         }
       />

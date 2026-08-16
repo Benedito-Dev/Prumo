@@ -3,6 +3,7 @@
 import { query } from '../config/db.js';
 import { ErroNegocio, naoEncontrado, conflito } from '../config/erros.js';
 import { textoValido, opcaoValida, uuidValido } from '../config/validar.js';
+import { registrar, calcularAlteracoes, ACOES } from '../auditoria/auditoria.service.js';
 
 export const TIPOS_VALIDOS = ['consumidor_final', 'pedreiro', 'construtora', 'revenda'];
 
@@ -75,7 +76,8 @@ export async function exigirCliente(id) {
 }
 
 // Mínimo obrigatório: nome e telefone (RF02) — não travar o balcão.
-export async function criarCliente(dados) {
+// `usuario` (do token) alimenta o log de auditoria; ver produto.service.
+export async function criarCliente(dados, usuario = null) {
   const { nome, telefone, tipo, observacao } = validarCliente(dados);
 
   const { rows } = await query(
@@ -84,13 +86,25 @@ export async function criarCliente(dados) {
      RETURNING *`,
     [nome, telefone, tipo, observacao]
   );
+
+  await registrar({
+    usuario,
+    acao: ACOES.CRIAR,
+    entidade: 'cliente',
+    entidade_id: rows[0].id,
+    entidade_nome: rows[0].nome,
+  });
   return rows[0];
 }
 
 // Substituição TOTAL — ver a nota em produto.service.atualizarProduto.
-export async function atualizarCliente(id, dados) {
+export async function atualizarCliente(id, dados, usuario = null) {
   uuidValido(id, 'cliente');
   const { nome, telefone, tipo, observacao } = validarCliente(dados);
+
+  // Estado ANTES, para o log dizer o que mudou.
+  const antes = await buscarCliente(id);
+  if (!antes) throw naoEncontrado('Cliente não encontrado');
 
   const { rows, rowCount } = await query(
     `UPDATE cliente
@@ -101,11 +115,24 @@ export async function atualizarCliente(id, dados) {
   );
 
   if (rowCount === 0) throw naoEncontrado('Cliente não encontrado');
+
+  const alteracoes = calcularAlteracoes(antes, rows[0]);
+  // Salvar o formulário sem mudar nada não vira linha no log.
+  if (alteracoes) {
+    await registrar({
+      usuario,
+      acao: ACOES.EDITAR,
+      entidade: 'cliente',
+      entidade_id: rows[0].id,
+      entidade_nome: rows[0].nome,
+      alteracoes,
+    });
+  }
   return rows[0];
 }
 
 // Substituição PARCIAL — o que a IA usa. Entra em uso na Fatia 2.
-export async function atualizarClienteParcial(id, alteracoes = {}) {
+export async function atualizarClienteParcial(id, alteracoes = {}, usuario = null) {
   const atual = await exigirCliente(id);
 
   const CAMPOS = ['nome', 'telefone', 'tipo', 'observacao'];
@@ -114,7 +141,8 @@ export async function atualizarClienteParcial(id, alteracoes = {}) {
     if (alteracoes[campo] !== undefined) merged[campo] = alteracoes[campo];
   }
 
-  return atualizarCliente(id, merged);
+  // Repassa o usuário: sem isso a escrita do Zé ficaria anônima no log.
+  return atualizarCliente(id, merged, usuario);
 }
 
 // Busca por nome parcial, para o Zé traduzir "o Marcos" em um registro.
@@ -132,7 +160,10 @@ export async function buscarClientesPorNome(termo) {
   return rows;
 }
 
-export async function removerCliente(id) {
+export async function removerCliente(id, usuario = null) {
+  // Lê antes de apagar: o log precisa dizer QUAL cliente sumiu.
+  const antes = await buscarCliente(id);
+
   let rowCount;
   try {
     ({ rowCount } = await query('DELETE FROM cliente WHERE id = $1 RETURNING id', [id]));
@@ -144,4 +175,12 @@ export async function removerCliente(id) {
     throw erro;
   }
   if (rowCount === 0) throw naoEncontrado('Cliente não encontrado');
+
+  await registrar({
+    usuario,
+    acao: ACOES.REMOVER,
+    entidade: 'cliente',
+    entidade_id: id,
+    entidade_nome: antes?.nome ?? null,
+  });
 }

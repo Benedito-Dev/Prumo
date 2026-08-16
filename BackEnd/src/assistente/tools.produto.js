@@ -102,7 +102,7 @@ export const TOOLS_PRODUTO = {
         required: ['nome', 'unidade', 'preco_venda'],
       },
     },
-    async executar(args) {
+    async executar(args, usuario) {
       return protegido(async () => {
         let categoria_id = null;
         if (args.categoria) {
@@ -117,7 +117,7 @@ export const TOOLS_PRODUTO = {
           preco_venda: args.preco_venda,
           preco_custo: args.preco_custo,
           categoria_id,
-        });
+        }, usuario);
 
         // criarProduto devolve a linha crua (sem categoria_nome, que vem
         // do JOIN). Recompõe com o nome que já foi resolvido acima.
@@ -159,7 +159,7 @@ export const TOOLS_PRODUTO = {
         required: [],
       },
     },
-    async executar(args) {
+    async executar(args, usuario) {
       return protegido(async () => {
         const achado = await resolverProduto(args);
         if (achado.falha) return achado.falha;
@@ -182,7 +182,7 @@ export const TOOLS_PRODUTO = {
           categoriaNova = args.categoria;
         }
 
-        const gravado = await atualizarProdutoParcial(antes.id, alteracoes);
+        const gravado = await atualizarProdutoParcial(antes.id, alteracoes, usuario);
         const depois = {
           ...gravado,
           categoria_nome: categoriaNova ?? antes.categoria_nome ?? null,
@@ -268,9 +268,9 @@ export const TOOLS_PRODUTO = {
     },
 
     // PASSO 2: só roda com token válido — ver confirmacao.js.
-    async executar(args) {
+    async executar(args, usuario) {
       return protegido(async () => {
-        const produto = await definirAtivoProduto(args.id, false);
+        const produto = await definirAtivoProduto(args.id, false, usuario);
         return {
           ok: true,
           acao: 'desativado',
@@ -306,7 +306,7 @@ export const TOOLS_PRODUTO = {
         required: [],
       },
     },
-    async executar(args) {
+    async executar(args, usuario) {
       return protegido(async () => {
         const { item, falha } = await resolverProduto(args);
         if (falha) return falha;
@@ -315,7 +315,7 @@ export const TOOLS_PRODUTO = {
           return { ok: false, erro: `${item.nome} já está ativo.` };
         }
 
-        const produto = await definirAtivoProduto(item.id, true);
+        const produto = await definirAtivoProduto(item.id, true, usuario);
         return {
           ok: true,
           acao: 'reativado',

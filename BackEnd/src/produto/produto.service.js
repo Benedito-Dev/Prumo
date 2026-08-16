@@ -6,6 +6,7 @@
 import { query } from '../config/db.js';
 import { ErroNegocio, naoEncontrado, conflito } from '../config/erros.js';
 import { textoValido, numeroValido, opcaoValida } from '../config/validar.js';
+import { registrar, calcularAlteracoes, ACOES } from '../auditoria/auditoria.service.js';
 
 export const UNIDADES_VALIDAS = [
   'saco', 'milheiro', 'm3', 'peca', 'barra', 'kg', 'metro', 'carrada',
@@ -71,7 +72,11 @@ export async function exigirProduto(id) {
   return produto;
 }
 
-export async function criarProduto(dados) {
+// `usuario` é o do token, usado só para o log de auditoria. Opcional para
+// não quebrar quem já chamava sem ele — mas quem escreve fica registrado
+// como desconhecido, então passe sempre a partir do controller e das
+// tools do Zé.
+export async function criarProduto(dados, usuario = null) {
   const { nome, unidade, preco_venda, preco_custo, categoria_id, imagem_url } = dados;
   validarProduto(dados);
 
@@ -82,6 +87,14 @@ export async function criarProduto(dados) {
        RETURNING *`,
       [nome, unidade, preco_venda, preco_custo ?? null, categoria_id ?? null, imagem_url ?? null]
     );
+
+    await registrar({
+      usuario,
+      acao: ACOES.CRIAR,
+      entidade: 'produto',
+      entidade_id: rows[0].id,
+      entidade_nome: rows[0].nome,
+    });
     return rows[0];
   } catch (erro) {
     throw traduzirErroDeBanco(erro);
@@ -91,9 +104,14 @@ export async function criarProduto(dados) {
 // Substituição TOTAL: campo ausente vira NULL. É o que o formulário da
 // tela faz, porque ele sempre manda a ficha inteira.
 // Para alterar só alguns campos, use atualizarProdutoParcial.
-export async function atualizarProduto(id, dados) {
+export async function atualizarProduto(id, dados, usuario = null) {
   const { nome, unidade, preco_venda, preco_custo, categoria_id, ativo, imagem_url } = dados;
   validarProduto(dados);
+
+  // Estado ANTES, para o log dizer o que mudou. Também resolve o 404 sem
+  // depender do rowCount depois.
+  const antes = await buscarProduto(id);
+  if (!antes) throw naoEncontrado('Produto não encontrado');
 
   let rows, rowCount;
   try {
@@ -111,6 +129,28 @@ export async function atualizarProduto(id, dados) {
 
   // Fora do try: o 404 não é erro de banco.
   if (rowCount === 0) throw naoEncontrado('Produto não encontrado');
+
+  const alteracoes = calcularAlteracoes(antes, rows[0]);
+  // Só registra se algo mudou de fato: salvar o formulário sem alterar
+  // nada encheria o log de linhas vazias.
+  if (alteracoes) {
+    // Ativar/desativar é a mudança que a pessoa percebe na tela ("sumiu
+    // da venda"), então ganha ação própria em vez de virar uma linha de
+    // "editar" com um booleano no meio.
+    const soAtivo = alteracoes.length === 1 && alteracoes[0].campo === 'ativo';
+    const acao = soAtivo
+      ? (rows[0].ativo ? ACOES.REATIVAR : ACOES.DESATIVAR)
+      : ACOES.EDITAR;
+
+    await registrar({
+      usuario,
+      acao,
+      entidade: 'produto',
+      entidade_id: rows[0].id,
+      entidade_nome: rows[0].nome,
+      alteracoes: soAtivo ? null : alteracoes,
+    });
+  }
   return rows[0];
 }
 
@@ -118,7 +158,7 @@ export async function atualizarProduto(id, dados) {
 // e grava. É o que a IA precisa — "muda o preço do cimento para 45" não
 // pode zerar categoria, custo e imagem.
 // Ainda não é usada por nenhuma rota; entra em uso na Fatia 2.
-export async function atualizarProdutoParcial(id, alteracoes = {}) {
+export async function atualizarProdutoParcial(id, alteracoes = {}, usuario = null) {
   const atual = await exigirProduto(id);
 
   // Só as chaves realmente enviadas sobrescrevem. `undefined` é
@@ -129,7 +169,9 @@ export async function atualizarProdutoParcial(id, alteracoes = {}) {
     if (alteracoes[campo] !== undefined) merged[campo] = alteracoes[campo];
   }
 
-  return atualizarProduto(id, merged);
+  // Repassa o usuário: sem isso, toda escrita vinda do Zé ficaria
+  // anônima no log.
+  return atualizarProduto(id, merged, usuario);
 }
 
 // Busca por nome parcial — como a pessoa fala ("cimento"), não como o
@@ -175,18 +217,32 @@ export async function contarVendasDoProduto(id) {
 }
 
 // Desativa sem apagar — preserva o histórico de vendas (princípio P6).
-export async function definirAtivoProduto(id, ativo) {
+export async function definirAtivoProduto(id, ativo, usuario = null) {
   const { rows, rowCount } = await query(
     `UPDATE produto SET ativo = $1 WHERE id = $2 RETURNING *`,
     [ativo, id]
   );
   if (rowCount === 0) throw naoEncontrado('Produto não encontrado');
+
+  // Desativar some da tela de venda; é a mudança que alguém nota e
+  // pergunta "quem tirou isso daqui?".
+  await registrar({
+    usuario,
+    acao: ativo ? ACOES.REATIVAR : ACOES.DESATIVAR,
+    entidade: 'produto',
+    entidade_id: rows[0].id,
+    entidade_nome: rows[0].nome,
+  });
   return rows[0];
 }
 
 // DELETE de verdade. Só passa em produto sem venda: a FK de item_venda
 // barra o resto, e é isso que preserva o histórico.
-export async function removerProduto(id) {
+export async function removerProduto(id, usuario = null) {
+  // Lê antes de apagar: depois do DELETE não há mais nome para registrar,
+  // e o log precisa dizer QUAL produto sumiu, não só um id.
+  const antes = await buscarProduto(id);
+
   let rowCount;
   try {
     ({ rowCount } = await query('DELETE FROM produto WHERE id = $1 RETURNING id', [id]));
@@ -200,4 +256,12 @@ export async function removerProduto(id) {
   }
   // Fora do try: o 404 não é erro de banco e não deve passar pelo catch.
   if (rowCount === 0) throw naoEncontrado('Produto não encontrado');
+
+  await registrar({
+    usuario,
+    acao: ACOES.REMOVER,
+    entidade: 'produto',
+    entidade_id: id,
+    entidade_nome: antes?.nome ?? null,
+  });
 }

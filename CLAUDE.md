@@ -46,6 +46,7 @@ node FrontEnd/src/utils/corrigirDitado.test.mjs     # 59 testes do corretor de d
 node FrontEnd/src/utils/recibo.test.mjs             # 42 testes do recibo (Node puro)
 node FrontEnd/src/utils/calculoVenda.test.mjs       # 63 testes das contas da venda (Node puro)
 node FrontEnd/src/utils/cobranca.test.mjs           # 27 testes da cobrança de fiado (Node puro)
+node FrontEnd/src/utils/historico.test.mjs          # 33 testes do histórico de alterações (Node puro)
 cd FrontEnd && npm run lint                         # oxlint
 ```
 

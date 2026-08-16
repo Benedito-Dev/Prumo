@@ -21,7 +21,7 @@ não esquecimento.
 | 4 | ~~**Validação de entrada na borda**~~ ✅ **feito em 16/08/2026** | Era pior que o previsto: `quantidade: "abc"` **gravava venda com `valor_total = NaN`** e contaminava o faturamento. Corrigido com `config/validar.js` + 58 testes. | M | `config/validar.js` |
 | 5 | ~~**Editar venda lançada**~~ ✅ **feito em 16/08/2026** | Só existia criar e cancelar. Agora "Corrigir venda" cancela a original e reabre a tela preenchida — sem redigitar nada, e sem reescrever histórico. | M | `venda.service.js` |
 | 6 | **Funcionar com internet caindo** | Depósito tem Wi-Fi ruim. Se cai no meio da venda, perde tudo. Rascunho em `localStorage` + fila de reenvio salva o núcleo sem virar PWA completo. | M–G | `NovaVenda.jsx` |
-| 7 | **Log de auditoria** | O schema já prevê `log_auditoria` como fase futura e nunca saiu. Quem cancelou a venda de R$ 4.000? Quem mudou o preço? Com dinheiro fiado envolvido, é questão de tempo. | M | schema + services |
+| 7 | ~~**Log de auditoria**~~ ✅ **feito em 16/08/2026** | Produto e cliente passaram a registrar quem fez, o quê e o que mudou, com tela de histórico para o dono. Venda e fiado ficaram de fora: já têm autoria própria. | M | `auditoria/` |
 | 8 | ~~**Cobrança de fiado é passiva**~~ ✅ **feito em 16/08/2026** | Agora há prazo padrão configurável, atrasados destacados e ordenados na tela, cobrança pronta no WhatsApp e alerta de vencido no painel. | M | `fiado` + `cobranca.js` |
 | 9 | ~~**Nenhum teste do que o usuário vê**~~ ✅ **feito em 16/08/2026** | As contas de `NovaVenda.jsx` saíram para `utils/calculoVenda.js` com 63 testes. O front passou de 59 para 191 testes. Renderização segue sem cobertura — decisão consciente, ver abaixo. | M | `calculoVenda.js` |
 | 10 | ~~**Sem caminho para produção**~~ 🟡 **parcial em 16/08/2026** | Migração e backup **feitos e testados**. O deploy em si (Neon + plataforma gerenciada) está documentado em `Prumo-Colocar-No-Ar.md`, aguardando decisão de hospedagem. | M–G | infra |
@@ -36,7 +36,30 @@ não esquecimento.
 4. ~~**#9** e **#8**~~ ✅ **concluídos em 16/08/2026** (ver as duas seções finais).
 5. **#10** — sem migração, todo o resto vira retrabalho no dia que existir dado real.
 
-**Restam:** #10 (só o deploy — migração e backup feitos), #6 (internet caindo), #7 (auditoria).
+**Restam:** #10 (só o deploy — migração e backup feitos) e #6 (internet caindo).
+
+---
+
+## Log de auditoria (16/08/2026) — item #7
+
+**O que já existia de graça:** venda guarda `usuario_id`, pagamento de fiado guarda quem recebeu, e a correção de venda deixa as duas versões no histórico. Registrar isso de novo duplicaria o dado e faria a tabela crescer a cada venda.
+
+**O buraco real era cadastro:** quem mudou o preço do cimento, quem editou o telefone do cliente, quem desativou o produto. É a pergunta que aparece quando o número do painel não bate com a memória de alguém.
+
+**O que existe agora:** `log_auditoria` (migração 003 — aplicada sem apagar o banco, o sistema de ontem já pagando dividendos) e uma tela `/historico` para o dono, com filtro por tipo e por pessoa.
+
+**Decisões que valem registrar:**
+
+- **Registrar nunca derruba a operação.** Se o log falhar, a escrita já aconteceu — abortar trocaria um problema pequeno por um grande. `registrar()` engole o erro e grita no console.
+- `usuario` entrou como **último parâmetro opcional** dos services, para não quebrar chamadas existentes. Controllers e as 4 tools de escrita do Zé foram atualizados para repassar — escrita por IA sem autoria seria o pior buraco possível, e há teste cobrindo isso.
+- **Salvar sem mudar nada não vira linha.** O diff compara o que o banco gravou antes/depois, não o que foi pedido.
+- Ativar/desativar tem ação própria, não vira "editar" com um booleano no meio.
+- Nome do usuário e da entidade são **cópias congeladas**: o log continua legível depois que o produto for apagado.
+- FK do usuário é `ON DELETE SET NULL` — apagar alguém não pode apagar o que essa pessoa fez.
+
+`utils/historico.js` (33 testes) traduz o log para português: `preco_venda` vira "Preço de venda", `"42.00"` vira "R$ 42,00", `null` vira "vazio". Sem isso a tela seria um dump de banco. A suíte pegou um bug real ali — categoria vazia aparecia como "vazio" em vez de "sem categoria".
+
+**Verificação:** 24/24 contra a API (incluindo o 403 do vendedor e o nome sobrevivendo ao delete), 7/7 nas escritas do Zé, 33/33 na tradução, 165/165 no Zé, 218/218 no front, lint e build limpos.
 
 ---
 

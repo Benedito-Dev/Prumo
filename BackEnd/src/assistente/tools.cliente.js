@@ -71,14 +71,14 @@ export const TOOLS_CLIENTE = {
         required: ['nome', 'telefone'],
       },
     },
-    async executar(args) {
+    async executar(args, usuario) {
       return protegido(async () => {
         const registro = await criarCliente({
           nome: args.nome,
           telefone: args.telefone,
           tipo: args.tipo,
           observacao: args.observacao,
-        });
+        }, usuario);
 
         return {
           ok: true,
@@ -112,7 +112,7 @@ export const TOOLS_CLIENTE = {
         required: [],
       },
     },
-    async executar(args) {
+    async executar(args, usuario) {
       return protegido(async () => {
         const achado = await resolverCliente(args);
         if (achado.falha) return achado.falha;
@@ -126,7 +126,7 @@ export const TOOLS_CLIENTE = {
         if (args.tipo !== undefined) alteracoes.tipo = args.tipo;
         if (args.observacao !== undefined) alteracoes.observacao = args.observacao;
 
-        const depois = await atualizarClienteParcial(antes.id, alteracoes);
+        const depois = await atualizarClienteParcial(antes.id, alteracoes, usuario);
         const mudancas = diferencas(antes, depois, CAMPOS_COMPARADOS);
 
         return {

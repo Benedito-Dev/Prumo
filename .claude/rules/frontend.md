@@ -90,6 +90,22 @@ Ao mexer em `corrigirDitado.js`:
 - **Nome ambíguo não é corrigido** de propósito: deixa como falado e o resolvedor do Zé pergunta. Corrigir para o nome errado é pior que não corrigir — o texto errado a pessoa vê, o trocado ela não percebe.
 - O texto parcial (enquanto a pessoa fala) **não** passa pelo corretor: trocar nome no meio da fala faria o texto dançar na tela.
 
+## Recibo da venda
+
+`utils/recibo.js` é **módulo puro** (sem React, sem DOM, sem rede) — como o corretor de ditado, e pelo mesmo motivo: dá para testá-lo em Node sem navegador nem impressora. Rode `node FrontEnd/src/utils/recibo.test.mjs` (42 testes) ao mexer.
+
+- `reciboTermico` mira **32 colunas** (bobina de 80mm em fonte monoespaçada padrão). A suíte falha se qualquer linha estourar — é o teste que pega nome de produto longo.
+- **Todo valor vem da venda gravada, nunca recalculado na tela.** O item traz `subtotal` congelado do banco (RF12); refazer a conta abriria espaço para o papel discordar do sistema, e o papel é a versão que vale numa discussão de balcão.
+- `moeda()` devolve espaço **não-quebrável** (U+00A0) depois do "R$". Ele é invisível na tela, conta no alinhamento e sai como lixo em impressora térmica — por isso o recibo o normaliza.
+- Nome de cliente longo é **quebrado em linhas, não truncado** (`linhaDuplaOuQuebrada`): é o recibo dele.
+- Recibo de fiado diz "valor em aberto"; sem isso o comprovante pareceria quitação.
+
+`components/AcoesRecibo.jsx` é usado por **duas** telas (confirmação em `NovaVenda` e detalhe em `Vendas`) — por isso subiu para `components/`. Ele abre uma janela própria com `<pre>` monoespaçado em vez de `window.print()` na página: menu, cartões e cores não têm o que fazer numa bobina. Usa `textContent`, nunca `innerHTML` — nome de produto com `<` ou `&` viraria marcação.
+
+Venda cancelada **não** oferece recibo: o papel diria que a compra aconteceu.
+
+Os dados do cabeçalho vêm de `GET /api/loja` (variáveis `LOJA_NOME`, `LOJA_TELEFONE`, `LOJA_ENDERECO`). Se a requisição falhar, o recibo sai com a marca PRUMO — a identificação da loja nunca pode impedir o cliente de sair com o papel.
+
 ## Lint
 
 `npm run lint` (oxlint) — configurado **só no FrontEnd**, não no BackEnd. `react/rules-of-hooks` é erro.

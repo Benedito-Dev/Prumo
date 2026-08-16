@@ -14,10 +14,14 @@ import { ErroNegocio, naoEncontrado, conflito } from '../config/erros.js';
 export const FORMAS_PAGAMENTO = ['dinheiro', 'pix', 'cartao', 'fiado'];
 
 // Cabeçalho da venda com os nomes para exibição.
+// O telefone do cliente vem junto porque o recibo é mandado no WhatsApp a
+// partir da tela de vendas — sem ele, o vendedor teria de procurar o
+// contato na lista do celular a cada segunda via.
 const SELECT_VENDA = `
   SELECT v.*,
-         c.nome AS cliente_nome,
-         u.nome AS usuario_nome
+         c.nome     AS cliente_nome,
+         c.telefone AS cliente_telefone,
+         u.nome     AS usuario_nome
     FROM venda v
     LEFT JOIN cliente c ON c.id = v.cliente_id
     JOIN usuario u ON u.id = v.usuario_id

@@ -39,6 +39,10 @@ services:
       ADMIN_NOME: Benedito
       ADMIN_EMAIL: beneditobittencourtt@gmail.com
       ADMIN_SENHA: prumo123
+      # cabeçalho do recibo — troque pelos dados reais do depósito
+      LOJA_NOME: ${LOJA_NOME:-PRUMO}
+      LOJA_TELEFONE: ${LOJA_TELEFONE:-}
+      LOJA_ENDERECO: ${LOJA_ENDERECO:-}
       # Chave do assistente (Zé). Vem do arquivo .env da raiz, que NÃO
       # entra no Git — segredo não mora em arquivo versionado.
       # Sem ela, /api/assistente responde 503 e o resto segue normal.

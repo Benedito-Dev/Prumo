@@ -15,7 +15,7 @@ não esquecimento.
 
 | # | Lacuna | Por que dói no mundo real | Esforço | Onde |
 |---|---|---|---|---|
-| 1 | **Recibo/comprovante da venda** | A venda é lançada e o cliente sai sem nada na mão. No depósito, o papelzinho é o que resolve discussão ("eu paguei 3 sacos"). Não é NF — é impressão térmica/PDF/WhatsApp. Fecha o ciclo da meta dos 30s. | M | `venda` + `Vendas.jsx` |
+| 1 | ~~**Recibo/comprovante da venda**~~ ✅ **feito em 16/08/2026** | A venda era lançada e o cliente saía sem nada na mão. Agora sai recibo térmico (bobina 80mm) e por WhatsApp, com cabeçalho da loja, na confirmação da venda e como segunda via no detalhe. | M | `recibo.js` + `AcoesRecibo.jsx` |
 | 2 | ~~**`/api/painel/*` aberta a qualquer autenticado**~~ ✅ **feito em 15/08/2026** | Dívida já registrada no `CLAUDE.md`: o vendedor via faturamento, ticket médio e o ranking dos colegas. Agora os seis indicadores da loja são `requireDono`, e o vendedor tem `meu-resumo`/`minha-evolucao` + a tela `MeuPainel.jsx`. | P | `painel.routes.js` |
 | 3 | ~~**Sem middleware global de erro e sem rate limit no login**~~ ✅ **feito em 15/08/2026** | Login limitado a 10 tentativas malsucedidas por IP/15 min; os 17 pontos que devolviam `detalhe: erro.message` agora logam no servidor e respondem só a mensagem amigável; `app.js` ganhou 404 em JSON e middleware de erro. | P | `app.js` |
 | 4 | **Validação de entrada na borda** | Não há Zod/Joi; o service confia no shape do corpo. `quantidade: "abc"` chega ao SQL. Com dinheiro em `NUMERIC` e `Number()` manual, é fonte de bug silencioso. | M | `*/controller.js` |
@@ -31,8 +31,10 @@ não esquecimento.
 ## Ordem sugerida de ataque
 
 1. ~~**#2 + #3**~~ ✅ **concluído em 15/08/2026** (ver "Parte 1" abaixo).
-2. **#1** — o recibo é o que faz o dono confiar no sistema em vez do caderno.
+2. ~~**#1**~~ ✅ **concluído em 16/08/2026** (ver "Recibo" abaixo).
 3. **#10** — sem migração, todo o resto vira retrabalho no dia que existir dado real.
+
+Próximos candidatos: **#5** (corrigir venda lançada — hoje o sistema é mais lento que o papel para consertar um erro) e **#10**.
 
 ---
 
@@ -59,3 +61,24 @@ Continuação da mesma linha, decidida depois de rever o que o vendedor enxergav
 - `RotaProtegida` ganhou `soDono`, aplicado também em `/usuarios` — o back já barrava, mas a tela abria e quebrava em 403.
 
 **Verificação:** 17/17 no recorte por papel (vendas, clientes, fiados, com tentativa de burla por query string e por id), 13/13 no ciclo completo do aviso de fiado (vende fiado → aviso → paga parcial → paga o resto → aviso some), 165/165 na suíte do Zé, lint e build limpos.
+
+---
+
+## Recibo da venda (16/08/2026) — item #1
+
+**O que existe agora**
+
+Dois formatos, escolhidos com o Benedito: **térmico** (bobina 80mm, 32 colunas) e **WhatsApp** (texto com marcação, link `wa.me` já preenchido). Com cabeçalho da loja — nome, telefone e endereço vindos de variável de ambiente (`LOJA_NOME`, `LOJA_TELEFONE`, `LOJA_ENDERECO`), não do banco, porque não há ferramenta de migração e são três campos.
+
+Aparece em dois lugares: na **confirmação da venda** (com o cliente ainda no balcão) e no **detalhe da venda**, como segunda via para quem volta com dúvida. Venda cancelada não oferece recibo.
+
+**Decisões que valem registrar**
+
+- `utils/recibo.js` é módulo puro, testável em Node sem impressora — mesmo princípio do corretor de ditado.
+- **Nenhum valor é recalculado na tela:** o item traz `subtotal` congelado do banco. O papel na mão do cliente é a versão que vale numa discussão, e ele não pode discordar do sistema.
+- A suíte falha se qualquer linha passar de 32 colunas. Foi ela que pegou o caso do nome de cliente longo, que era truncado em vez de quebrado.
+- `SELECT_VENDA` passou a trazer `cliente_telefone`, senão cada envio no WhatsApp exigiria procurar o contato na lista do celular.
+
+**Verificação:** 42/42 na suíte do recibo (largura, contas, fiado, loja sem cadastro, links de WhatsApp, entrada malformada), 14/14 contra a API rodando — incluindo montar o recibo com dados vindos do banco e conferir o total, 165/165 na suíte do Zé, lint e build limpos.
+
+**Fica registrado:** não há tela para editar os dados da loja — hoje é variável de ambiente, e mudar exige reiniciar o container. Quando existir tela de configuração, `config/loja.js` vira o valor padrão dela.

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Plus, Receipt, X, Ban, Search } from 'lucide-react';
 import LayoutApp from '../components/LayoutApp';
 import Seletor from '../components/Seletor';
+import AcoesRecibo from '../components/AcoesRecibo';
 import { vendasService } from '../services/vendas';
 import { useAuth } from '../auth/AuthContext';
 import { moeda, numero } from '../utils/formato';
@@ -413,6 +414,13 @@ function ModalDetalheVenda({ id, onFechar, onCancelada }) {
                 </span>
               </div>
             </div>
+
+            {/* Recibo — segunda via para o cliente que volta com dúvida.
+                Venda cancelada não tem recibo: o papel diria que a compra
+                aconteceu, e ela foi desfeita. */}
+            {!cancelada && (
+              <AcoesRecibo venda={venda} telefoneCliente={venda.cliente_telefone} compacto />
+            )}
 
             {/* ação cancelar (só se concluída) */}
             {!cancelada &&

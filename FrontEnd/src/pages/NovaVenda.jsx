@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Search, Plus, Trash2, UserPlus, X, Check } from 'lucide-react';
 import LayoutApp from '../components/LayoutApp';
+import AcoesRecibo from '../components/AcoesRecibo';
 import { vendasService } from '../services/vendas';
 import { fiadosService } from '../services/fiados';
 import { moeda } from '../utils/formato';
@@ -159,6 +160,13 @@ export default function NovaVenda() {
             <p className="text-[40px] font-bold tabular-nums text-nivel my-5">
               {moeda(vendaSalva.valor_total)}
             </p>
+
+            {/* O recibo vem antes de "Nova venda": é agora, com o cliente
+                ainda no balcão, que o papel serve para alguma coisa. */}
+            <div className="mb-3">
+              <AcoesRecibo venda={vendaSalva} telefoneCliente={cliente?.telefone} />
+            </div>
+
             <div className="flex gap-2">
               <button
                 onClick={() => navigate('/')}

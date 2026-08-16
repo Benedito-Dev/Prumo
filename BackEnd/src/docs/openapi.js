@@ -127,6 +127,11 @@ const schemas = {
       id: { type: 'string', format: 'uuid' },
       cliente_id: { type: 'string', format: 'uuid', nullable: true },
       cliente_nome: { type: 'string', nullable: true },
+      cliente_telefone: {
+        type: 'string',
+        nullable: true,
+        description: 'para mandar o recibo no WhatsApp sem procurar o contato',
+      },
       usuario_id: { type: 'string', format: 'uuid' },
       usuario_nome: { type: 'string' },
       forma_pagamento: {
@@ -219,6 +224,7 @@ export const openapiSpec = {
     { name: 'Vendas', description: 'Registro de vendas — o núcleo (RF10–RF14)' },
     { name: 'Fiados', description: 'Contas a receber — vendas fiado em aberto e pagamentos' },
     { name: 'Painel', description: 'Indicadores do painel (RF16–RF22)' },
+    { name: 'Loja', description: 'Identificação da loja — cabeçalho do recibo' },
     { name: 'Assistente', description: 'Chat com IA sobre os dados do negócio (via OpenRouter)' },
   ],
   components: {
@@ -721,6 +727,28 @@ export const openapiSpec = {
           }),
           404: erro('Não encontrada'),
           409: erro('Já está cancelada'),
+        },
+      },
+    },
+
+    // ---------------- LOJA ----------------
+    '/loja': {
+      get: {
+        tags: ['Loja'],
+        summary: 'Identificação da loja para o cabeçalho do recibo',
+        description:
+          'Vem de variável de ambiente (LOJA_NOME, LOJA_TELEFONE, LOJA_ENDERECO), não do ' +
+          'banco — não há ferramenta de migração e são três campos. Todos opcionais: sem ' +
+          'nenhum, o recibo sai com a marca PRUMO.',
+        responses: {
+          200: ok({
+            type: 'object',
+            properties: {
+              nome: { type: 'string', example: 'Deposito Sao Jose' },
+              telefone: { type: 'string', example: '(11) 3456-7890' },
+              endereco: { type: 'string', example: 'Rua das Obras, 120 - Centro' },
+            },
+          }),
         },
       },
     },

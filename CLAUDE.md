@@ -33,10 +33,11 @@ Sem Docker: `cd BackEnd && npm run dev` e `cd FrontEnd && npm run dev` (o Vite f
 cd BackEnd && npm test                              # suíte de services e tools do Zé (precisa do banco de pé)
 docker exec prumo-api node scripts/testar-tools.mjs # a mesma suíte, dentro do container
 node FrontEnd/src/utils/corrigirDitado.test.mjs     # 59 testes do corretor de ditado (Node puro)
+node FrontEnd/src/utils/recibo.test.mjs             # 42 testes do recibo (Node puro)
 cd FrontEnd && npm run lint                         # oxlint
 ```
 
-Não há framework de teste, watcher nem CI: são scripts `.mjs` com asserts próprios. Ao mexer em service, tool ou no corretor de ditado, **rode a suíte correspondente e mostre a saída**. `npm test` no BackEnd falha sem banco de pé e sem nenhum usuário cadastrado (as FKs de autoria exigem um usuário real).
+Não há framework de teste, watcher nem CI: são scripts `.mjs` com asserts próprios. Ao mexer em service, tool, no corretor de ditado ou no recibo, **rode a suíte correspondente e mostre a saída**. `npm test` no BackEnd falha sem banco de pé e sem nenhum usuário cadastrado (as FKs de autoria exigem um usuário real).
 
 ## Arquitetura — as regras que não se quebram
 

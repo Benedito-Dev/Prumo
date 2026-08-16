@@ -2,16 +2,21 @@
 // Mesma ideia do produto.service: sem HTTP, lança ErroNegocio.
 import { query } from '../config/db.js';
 import { ErroNegocio, naoEncontrado, conflito } from '../config/erros.js';
+import { textoValido, opcaoValida, uuidValido } from '../config/validar.js';
 
 export const TIPOS_VALIDOS = ['consumidor_final', 'pedreiro', 'construtora', 'revenda'];
 
-function validarCliente({ nome, telefone, tipo }) {
-  if (!nome || !telefone) {
-    throw new ErroNegocio('Nome e telefone são obrigatórios');
-  }
-  if (tipo && !TIPOS_VALIDOS.includes(tipo)) {
-    throw new ErroNegocio(`Tipo inválido. Use: ${TIPOS_VALIDOS.join(', ')}`);
-  }
+// Valida E devolve os campos já limpos. Devolver importa: antes a
+// checagem só dizia "está ok" e o valor CRU seguia para o SQL — nome com
+// 5000 caracteres estourava o VARCHAR(120) e virava 500, e `nome: 12345`
+// era aceito e gravado como a string "12345".
+function validarCliente({ nome, telefone, tipo, observacao }) {
+  return {
+    nome: textoValido(nome, 'nome'),
+    telefone: textoValido(telefone, 'telefone'),
+    tipo: opcaoValida(tipo, 'tipo', TIPOS_VALIDOS, { obrigatorio: false }),
+    observacao: textoValido(observacao, 'observacao', { obrigatorio: false }),
+  };
 }
 
 // Sem busca: lista tudo. Com busca: nome parcial OU telefone (RF05).
@@ -71,29 +76,28 @@ export async function exigirCliente(id) {
 
 // Mínimo obrigatório: nome e telefone (RF02) — não travar o balcão.
 export async function criarCliente(dados) {
-  const { nome, telefone, tipo, observacao } = dados;
-  validarCliente(dados);
+  const { nome, telefone, tipo, observacao } = validarCliente(dados);
 
   const { rows } = await query(
     `INSERT INTO cliente (nome, telefone, tipo, observacao)
      VALUES ($1, $2, $3, $4)
      RETURNING *`,
-    [nome, telefone, tipo ?? null, observacao ?? null]
+    [nome, telefone, tipo, observacao]
   );
   return rows[0];
 }
 
 // Substituição TOTAL — ver a nota em produto.service.atualizarProduto.
 export async function atualizarCliente(id, dados) {
-  const { nome, telefone, tipo, observacao } = dados;
-  validarCliente(dados);
+  uuidValido(id, 'cliente');
+  const { nome, telefone, tipo, observacao } = validarCliente(dados);
 
   const { rows, rowCount } = await query(
     `UPDATE cliente
         SET nome = $1, telefone = $2, tipo = $3, observacao = $4
       WHERE id = $5
     RETURNING *`,
-    [nome, telefone, tipo ?? null, observacao ?? null, id]
+    [nome, telefone, tipo, observacao, id]
   );
 
   if (rowCount === 0) throw naoEncontrado('Cliente não encontrado');

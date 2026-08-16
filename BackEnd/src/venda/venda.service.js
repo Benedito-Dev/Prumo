@@ -10,6 +10,13 @@
 // dentro um nome nunca entra.
 import { pool, query } from '../config/db.js';
 import { ErroNegocio, naoEncontrado, conflito } from '../config/erros.js';
+import {
+  numeroValido,
+  uuidValido,
+  listaValida,
+  opcaoValida,
+  MAX_ITENS_VENDA,
+} from '../config/validar.js';
 
 export const FORMAS_PAGAMENTO = ['dinheiro', 'pix', 'cartao', 'fiado'];
 
@@ -85,24 +92,37 @@ export async function exigirVenda(id) {
 // Valida o pedido ANTES de abrir a transação. Separado de criarVenda
 // porque a tool do Zé precisa validar para montar a nota de conferência
 // sem gravar nada.
+//
+// A checagem antiga era `Number(item.quantidade) <= 0`, que NÃO pega
+// lixo: `Number('abc')` é NaN, e NaN não é menor nem maior que zero, então
+// a comparação dá false e o item passava. O NUMERIC do Postgres aceita
+// NaN como valor válido — a venda gravava com valor_total = NaN e
+// contaminava a soma do faturamento inteiro. Daí `numeroValido`, que
+// rejeita NaN e Infinity explicitamente.
 export function validarPedidoDeVenda({ forma_pagamento, itens, desconto }) {
-  if (Number(desconto) < 0) {
-    throw new ErroNegocio('desconto não pode ser negativo');
+  if (desconto !== undefined && desconto !== null && desconto !== '') {
+    numeroValido(desconto, 'desconto', { permitirZero: true });
   }
-  if (!forma_pagamento || !FORMAS_PAGAMENTO.includes(forma_pagamento)) {
-    throw new ErroNegocio(`forma_pagamento inválida. Use: ${FORMAS_PAGAMENTO.join(', ')}`);
-  }
-  if (!Array.isArray(itens) || itens.length === 0) {
-    throw new ErroNegocio('A venda precisa de ao menos um item');
-  }
-  for (const item of itens) {
-    if (!item.produto_id) {
-      throw new ErroNegocio('Cada item precisa de produto_id');
+  // "forma de pagamento", não "forma_pagamento": nome de coluna não é
+  // texto de tela.
+  opcaoValida(forma_pagamento, 'forma de pagamento', FORMAS_PAGAMENTO, { feminino: true });
+  listaValida(itens, 'itens', { max: MAX_ITENS_VENDA });
+
+  itens.forEach((item, i) => {
+    // O número da linha entra na mensagem: numa venda de 8 itens, "o item
+    // 3 está com a quantidade errada" é acionável; "um item está errado"
+    // manda a pessoa conferir tudo de novo.
+    const onde = itens.length > 1 ? ` (item ${i + 1})` : '';
+    if (!item || typeof item !== 'object') {
+      throw new ErroNegocio(`Item inválido${onde}`);
     }
-    if (item.quantidade === undefined || Number(item.quantidade) <= 0) {
-      throw new ErroNegocio('Cada item precisa de quantidade maior que zero');
+    uuidValido(item.produto_id, `produto do item${onde}`);
+    numeroValido(item.quantidade, `quantidade${onde}`);
+    // Preço zero é legítimo — brinde, bonificação, cortesia no balcão.
+    if (item.preco_unitario !== undefined && item.preco_unitario !== null) {
+      numeroValido(item.preco_unitario, `preço${onde}`, { permitirZero: true });
     }
-  }
+  });
 }
 
 // Monta a nota SEM gravar: resolve preço de cada item, soma e aplica
@@ -110,11 +130,18 @@ export function validarPedidoDeVenda({ forma_pagamento, itens, desconto }) {
 // confirmar, e é a mesma conta que criarVenda faz depois — se
 // divergissem, a nota mentiria.
 export async function simularVenda({ itens, desconto = 0 }) {
-  const descontoNum = emReais(Number(desconto) || 0);
+  // A nota do Zé é conferida por gente antes de virar venda; ela não pode
+  // exibir NaN nem números impossíveis.
+  listaValida(itens, 'itens', { max: MAX_ITENS_VENDA });
+  const descontoNum = emReais(
+    desconto ? numeroValido(desconto, 'desconto', { permitirZero: true }) : 0
+  );
   const linhas = [];
   let soma = 0;
 
   for (const item of itens) {
+    uuidValido(item.produto_id, 'produto');
+    numeroValido(item.quantidade, 'quantidade');
     const { rows } = await query(
       'SELECT id, nome, unidade, preco_venda FROM produto WHERE id = $1 AND ativo = TRUE',
       [item.produto_id]
@@ -126,10 +153,9 @@ export async function simularVenda({ itens, desconto = 0 }) {
 
     // Preço negociado no balcão tem prioridade sobre o de tabela (RF12).
     const preco =
-      item.preco_unitario !== undefined
-        ? Number(item.preco_unitario)
+      item.preco_unitario !== undefined && item.preco_unitario !== null
+        ? numeroValido(item.preco_unitario, 'preço', { permitirZero: true })
         : Number(produto.preco_venda);
-    if (preco < 0) throw new ErroNegocio('preco_unitario não pode ser negativo');
 
     const quantidade = Number(item.quantidade);
     const subtotal = emReais(quantidade * preco);
@@ -160,8 +186,16 @@ export async function simularVenda({ itens, desconto = 0 }) {
 
 // Grava venda + itens numa transação: ou tudo, ou nada.
 export async function criarVenda({ cliente_id, usuario_id, forma_pagamento, itens, desconto }) {
-  const descontoNum = Number(desconto) || 0;
-  validarPedidoDeVenda({ forma_pagamento, itens, desconto: descontoNum });
+  // Valida ANTES de converter. `Number('abc') || 0` daria 0 e engoliria a
+  // entrada inválida em silêncio — o pedido seria gravado com desconto
+  // zero, e quem digitou nunca saberia que o valor não entrou.
+  validarPedidoDeVenda({ forma_pagamento, itens, desconto });
+
+  const descontoNum = desconto ? Number(desconto) : 0;
+
+  // UUID malformado chegaria ao SQL e estouraria com 22P02, que o
+  // usuário lê como "Falha inesperada".
+  uuidValido(cliente_id, 'cliente', { obrigatorio: false });
 
   const client = await pool.connect();
   try {

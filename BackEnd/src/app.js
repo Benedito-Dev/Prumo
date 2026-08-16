@@ -18,8 +18,26 @@ app.set('trust proxy', 1);
 
 // credentials:true permite o cookie httpOnly do refresh trafegar
 app.use(cors({ origin: true, credentials: true }));
-app.use(express.json());
+
+// Teto de 256 KB: uma venda de balcão tem alguns itens, não megabytes.
+// Sem limite, um corpo gigante ocupa memória do processo antes de
+// qualquer validação rodar.
+app.use(express.json({ limit: '256kb' }));
 app.use(cookieParser());
+
+// JSON malformado (ou grande demais) é erro de quem chamou, não do
+// servidor. Sem este middleware, o express.json lança e a requisição cai
+// no handler genérico como 500 — dizendo "Falha inesperada" para um
+// problema que está no corpo enviado.
+app.use((erro, req, res, next) => {
+  if (erro?.type === 'entity.too.large') {
+    return res.status(413).json({ erro: 'Requisição grande demais.' });
+  }
+  if (erro instanceof SyntaxError && 'body' in erro) {
+    return res.status(400).json({ erro: 'Requisição malformada.' });
+  }
+  next(erro);
+});
 
 // Documentação interativa (Swagger UI) em /api/docs
 app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(openapiSpec, {

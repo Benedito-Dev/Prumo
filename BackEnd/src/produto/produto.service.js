@@ -5,6 +5,7 @@
 // quanto às tools do Zé, sem que nenhum dos dois duplique SQL.
 import { query } from '../config/db.js';
 import { ErroNegocio, naoEncontrado, conflito } from '../config/erros.js';
+import { textoValido, numeroValido, opcaoValida } from '../config/validar.js';
 
 export const UNIDADES_VALIDAS = [
   'saco', 'milheiro', 'm3', 'peca', 'barra', 'kg', 'metro', 'carrada',
@@ -19,17 +20,16 @@ const SELECT_PRODUTO = `
 
 // Valida os campos obrigatórios. Lança em vez de retornar string:
 // quem chama não pode esquecer de checar o retorno.
-function validarProduto({ nome, unidade, preco_venda }) {
-  if (!nome) throw new ErroNegocio('Nome é obrigatório');
-  if (!unidade) throw new ErroNegocio('Unidade é obrigatória');
-  if (!UNIDADES_VALIDAS.includes(unidade)) {
-    throw new ErroNegocio(`Unidade inválida. Use: ${UNIDADES_VALIDAS.join(', ')}`);
-  }
-  if (preco_venda === undefined || preco_venda === null) {
-    throw new ErroNegocio('Preço de venda é obrigatório');
-  }
-  if (Number(preco_venda) < 0) {
-    throw new ErroNegocio('Preço de venda não pode ser negativo');
+// `Number(preco_venda) < 0` não pegava lixo: `Number('abc')` é NaN, e NaN
+// não é menor que zero, então a comparação dava false e o valor seguia
+// para o SQL — que respondia 500 em vez de dizer o que está errado.
+// Preço zero é aceito de propósito: brinde e bonificação existem.
+function validarProduto({ nome, unidade, preco_venda, preco_custo }) {
+  textoValido(nome, 'nome');
+  opcaoValida(unidade, 'unidade', UNIDADES_VALIDAS, { feminino: true });
+  numeroValido(preco_venda, 'preço de venda', { permitirZero: true });
+  if (preco_custo !== undefined && preco_custo !== null && preco_custo !== '') {
+    numeroValido(preco_custo, 'preço de custo', { permitirZero: true });
   }
 }
 

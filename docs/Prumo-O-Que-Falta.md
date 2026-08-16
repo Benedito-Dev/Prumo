@@ -18,7 +18,7 @@ não esquecimento.
 | 1 | ~~**Recibo/comprovante da venda**~~ ✅ **feito em 16/08/2026** | A venda era lançada e o cliente saía sem nada na mão. Agora sai recibo térmico (bobina 80mm) e por WhatsApp, com cabeçalho da loja, na confirmação da venda e como segunda via no detalhe. | M | `recibo.js` + `AcoesRecibo.jsx` |
 | 2 | ~~**`/api/painel/*` aberta a qualquer autenticado**~~ ✅ **feito em 15/08/2026** | Dívida já registrada no `CLAUDE.md`: o vendedor via faturamento, ticket médio e o ranking dos colegas. Agora os seis indicadores da loja são `requireDono`, e o vendedor tem `meu-resumo`/`minha-evolucao` + a tela `MeuPainel.jsx`. | P | `painel.routes.js` |
 | 3 | ~~**Sem middleware global de erro e sem rate limit no login**~~ ✅ **feito em 15/08/2026** | Login limitado a 10 tentativas malsucedidas por IP/15 min; os 17 pontos que devolviam `detalhe: erro.message` agora logam no servidor e respondem só a mensagem amigável; `app.js` ganhou 404 em JSON e middleware de erro. | P | `app.js` |
-| 4 | **Validação de entrada na borda** | Não há Zod/Joi; o service confia no shape do corpo. `quantidade: "abc"` chega ao SQL. Com dinheiro em `NUMERIC` e `Number()` manual, é fonte de bug silencioso. | M | `*/controller.js` |
+| 4 | ~~**Validação de entrada na borda**~~ ✅ **feito em 16/08/2026** | Era pior que o previsto: `quantidade: "abc"` **gravava venda com `valor_total = NaN`** e contaminava o faturamento. Corrigido com `config/validar.js` + 58 testes. | M | `config/validar.js` |
 | 5 | ~~**Editar venda lançada**~~ ✅ **feito em 16/08/2026** | Só existia criar e cancelar. Agora "Corrigir venda" cancela a original e reabre a tela preenchida — sem redigitar nada, e sem reescrever histórico. | M | `venda.service.js` |
 | 6 | **Funcionar com internet caindo** | Depósito tem Wi-Fi ruim. Se cai no meio da venda, perde tudo. Rascunho em `localStorage` + fila de reenvio salva o núcleo sem virar PWA completo. | M–G | `NovaVenda.jsx` |
 | 7 | **Log de auditoria** | O schema já prevê `log_auditoria` como fase futura e nunca saiu. Quem cancelou a venda de R$ 4.000? Quem mudou o preço? Com dinheiro fiado envolvido, é questão de tempo. | M | schema + services |
@@ -36,7 +36,45 @@ não esquecimento.
 4. ~~**#9** e **#8**~~ ✅ **concluídos em 16/08/2026** (ver as duas seções finais).
 5. **#10** — sem migração, todo o resto vira retrabalho no dia que existir dado real.
 
-**Restam:** #10 (só o deploy — migração e backup feitos), #6 (internet caindo), #7 (auditoria), #4 (validação de entrada).
+**Restam:** #10 (só o deploy — migração e backup feitos), #6 (internet caindo), #7 (auditoria).
+
+---
+
+## Validação de entrada (16/08/2026) — item #4
+
+**O bug era pior do que a lista dizia.** Sondei a API antes de escrever qualquer coisa, e `quantidade: "abc"` **não era rejeitado: gravava a venda**.
+
+A raiz: a checagem era `Number(item.quantidade) <= 0`, e `NaN` não é menor nem maior que zero — a comparação dá `false` e o item passa. E o `NUMERIC` do Postgres **aceita `NaN` como valor válido**. Resultado confirmado no banco:
+
+```
+valor_total no banco: NaN
+entra no faturamento como: NaN
+aparece na lista de vendas: SIM (total NaN)
+```
+
+Como `NaN + qualquer coisa = NaN`, **uma venda dessas zeraria o painel inteiro** — sem erro, sem log, sem pista.
+
+**O que mudou:** `config/validar.js`, módulo puro com 58 testes. A regra que ele encapsula: `Number(x)` não valida nada (devolve `NaN` para lixo, `Infinity` para `"1e400"`, `0` para `''`, `null`, `[]` e `false`).
+
+Aplicado em venda, cliente e produto. Na borda HTTP, `app.js` ganhou limite de 256 KB no corpo e tradução de JSON malformado para 400.
+
+**Antes → depois** (sondagem contra a API real):
+
+| Entrada | Antes | Depois |
+|---|---|---|
+| `quantidade: "abc"` | ✅ grava NaN | 400 "Quantidade precisa ser um número válido" |
+| `preco_unitario: "abc"` | ✅ grava NaN | 400 |
+| `desconto: "abc"` | ✅ aceita | 400 |
+| `nome: 12345` | ✅ vira `"12345"` | 400 "Nome precisa ser um texto" |
+| `quantidade: 1e12` | 500 cru | 400 "Quantidade é grande demais" |
+| `cliente_id: "xxx"` | 500 cru | 400 "Cliente inválido" |
+| nome com 5000 chars | 500 cru | 400 com o limite |
+| 5000 itens | 500 cru | 413 |
+| JSON quebrado | 500 cru | 400 "Requisição malformada" |
+
+**Detalhe de produto, não de código:** as mensagens começam com maiúscula, não citam nome de coluna (`forma de pagamento`, não `forma_pagamento`), não falam em UUID, e concordam em gênero — "unidade inválida", não "unidade inválido". Quem lê é o balconista.
+
+**Verificação:** 58/58 na suíte nova, 165/165 no Zé (11 asserções precisaram ser alinhadas às mensagens novas), 191/191 no front, build limpo.
 
 ---
 

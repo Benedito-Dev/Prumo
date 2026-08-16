@@ -23,6 +23,31 @@ Um diretório por domínio em `src/`, cada um com `*.routes.js` → `*.controlle
 
 `src/docs/openapi.js` mantém a spec do Swagger (`/api/docs`) escrita à mão: ~990 linhas, 42 operações, e **hoje cobre 100% das rotas**. Não há geração automática — **rota nova sem entrada lá quebra essa cobertura.** Ao adicionar, siga o formato vizinho (`tags`, `summary`, `security`, exemplos de resposta).
 
+## Validação de entrada (`config/validar.js`)
+
+**`Number(x)` não valida nada.** Ele devolve `NaN` para lixo, `Infinity` para `"1e400"`, e `0` para string vazia, `null`, `[]` e `false`. Foi assim que `quantidade: "abc"` gravou venda: a checagem era `Number(q) <= 0`, e **NaN não é menor nem maior que zero**, então o `if` não disparava.
+
+Pior: **o `NUMERIC` do Postgres aceita `NaN` como valor válido.** A venda entrava com `valor_total = NaN` e contaminava a soma do faturamento inteiro (`NaN + qualquer coisa = NaN`), sem nada no log.
+
+Use os validadores em vez de comparar à mão:
+
+```js
+numeroValido(qtd, 'quantidade');                          // rejeita NaN, Infinity, negativo, zero
+numeroValido(preco, 'preço', { permitirZero: true });     // zero é brinde, legítimo
+textoValido(nome, 'nome');                                // rejeita número, corta espaços, checa VARCHAR
+uuidValido(id, 'cliente', { obrigatorio: false });        // evita o 22P02 virando 500
+listaValida(itens, 'itens', { max: MAX_ITENS_VENDA });
+opcaoValida(unidade, 'unidade', UNIDADES, { feminino: true });
+```
+
+`textoValido` e `validarCliente` **devolvem** o valor limpo — use o retorno, não a entrada crua, senão o trim e os limites não chegam ao SQL.
+
+Mensagens começam com maiúscula (são frases lidas na tela), não citam nome de coluna (`forma de pagamento`, não `forma_pagamento`) e não falam em UUID. `feminino: true` existe para "unidade inválida" não sair como "unidade inválido".
+
+Na borda HTTP, `app.js` limita o corpo a 256 KB e traduz JSON malformado em 400 — sem isso o `express.json` lançava e caía no handler genérico como 500.
+
+Suíte: `node BackEnd/scripts/testar-validar.mjs` (58 testes, Node puro, sem banco).
+
 ## Erros
 
 `ErroNegocio` (`config/erros.js`) é a ponte service → chamador. Tem `status` (sugestão HTTP) e `codigo` (identificador estável, para decidir por programa sem casar string de mensagem).

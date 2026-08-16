@@ -2,6 +2,7 @@
 import bcrypt from 'bcryptjs';
 import { query } from '../config/db.js';
 import { conferirSenha, gerarHash } from '../auth/senha.service.js';
+import { responderErro } from '../config/erros.js';
 
 const PAPEIS_VALIDOS = ['dono', 'vendedor'];
 const SENHA_MINIMA = 4;
@@ -20,7 +21,7 @@ export async function listarUsuarios(req, res) {
     );
     res.json(resultado.rows);
   } catch (erro) {
-    res.status(500).json({ erro: 'Falha ao listar usuários', detalhe: erro.message });
+    responderErro(res, erro, 'Falha ao listar usuários');
   }
 }
 
@@ -38,7 +39,7 @@ export async function buscarUsuario(req, res) {
     }
     res.json(resultado.rows[0]);
   } catch (erro) {
-    res.status(500).json({ erro: 'Falha ao buscar usuário', detalhe: erro.message });
+    responderErro(res, erro, 'Falha ao buscar usuário');
   }
 }
 
@@ -74,7 +75,7 @@ export async function criarUsuario(req, res) {
     if (erro.code === '23505') {
       return res.status(409).json({ erro: 'Já existe um usuário com esse e-mail' });
     }
-    res.status(500).json({ erro: 'Falha ao criar usuário', detalhe: erro.message });
+    responderErro(res, erro, 'Falha ao criar usuário');
   }
 }
 
@@ -98,7 +99,7 @@ export async function alternarAtivo(req, res) {
     }
     res.json(resultado.rows[0]);
   } catch (erro) {
-    res.status(500).json({ erro: 'Falha ao atualizar usuário', detalhe: erro.message });
+    responderErro(res, erro, 'Falha ao atualizar usuário');
   }
 }
 
@@ -125,7 +126,7 @@ export async function trocarMinhaSenha(req, res) {
     await query('UPDATE usuario SET senha_hash = $1 WHERE id = $2', [hash, req.usuario.id]);
     res.json({ ok: true });
   } catch (erro) {
-    res.status(500).json({ erro: 'Falha ao trocar senha', detalhe: erro.message });
+    responderErro(res, erro, 'Falha ao trocar senha');
   }
 }
 
@@ -147,6 +148,6 @@ export async function resetarSenha(req, res) {
     if (r.rowCount === 0) return res.status(404).json({ erro: 'Usuário não encontrado' });
     res.json({ ok: true });
   } catch (erro) {
-    res.status(500).json({ erro: 'Falha ao resetar senha', detalhe: erro.message });
+    responderErro(res, erro, 'Falha ao resetar senha');
   }
 }

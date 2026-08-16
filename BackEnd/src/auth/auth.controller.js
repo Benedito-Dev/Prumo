@@ -2,6 +2,7 @@
 // Fluxo: login -> access (resposta JSON) + refresh (cookie httpOnly).
 // O refresh é persistido e rotacionado a cada renovação.
 import { query } from '../config/db.js';
+import { responderErro } from '../config/erros.js';
 import { conferirSenha } from './senha.service.js';
 import {
   gerarAccessToken,
@@ -65,7 +66,7 @@ export async function login(req, res) {
     const accessToken = await emitirSessao(res, usuario);
     res.json({ accessToken, usuario: usuarioPublico(usuario) });
   } catch (erro) {
-    res.status(500).json({ erro: 'Falha no login', detalhe: erro.message });
+    responderErro(res, erro, 'Falha no login');
   }
 }
 
@@ -100,7 +101,7 @@ export async function refresh(req, res) {
     const accessToken = await emitirSessao(res, usuario);
     res.json({ accessToken, usuario: usuarioPublico(usuario) });
   } catch (erro) {
-    res.status(500).json({ erro: 'Falha ao renovar sessão', detalhe: erro.message });
+    responderErro(res, erro, 'Falha ao renovar sessão');
   }
 }
 
@@ -119,7 +120,7 @@ export async function logout(req, res) {
     res.clearCookie(COOKIE_REFRESH, { path: '/api/auth' });
     res.json({ ok: true });
   } catch (erro) {
-    res.status(500).json({ erro: 'Falha no logout', detalhe: erro.message });
+    responderErro(res, erro, 'Falha no logout');
   }
 }
 
@@ -130,6 +131,6 @@ export async function me(req, res) {
     if (r.rowCount === 0) return res.status(404).json({ erro: 'Usuário não encontrado' });
     res.json(usuarioPublico(r.rows[0]));
   } catch (erro) {
-    res.status(500).json({ erro: 'Falha ao carregar usuário', detalhe: erro.message });
+    responderErro(res, erro, 'Falha ao carregar usuário');
   }
 }

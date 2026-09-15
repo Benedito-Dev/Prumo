@@ -5,6 +5,7 @@ import {
   buscarVenda,
   criarVenda,
   cancelarVenda,
+  corrigirVenda,
 } from './venda.controller.js';
 
 const router = Router();
@@ -12,6 +13,7 @@ const router = Router();
 router.get('/', listarVendas);            // ?de= &ate= &status= filtram
 router.get('/:id', buscarVenda);          // cabeçalho + itens
 router.post('/', criarVenda);             // lança a venda (transação)
-router.patch('/:id/cancelar', cancelarVenda);  // soft delete
+router.post('/:id/corrigir', corrigirVenda);   // cancela e devolve o molde
+router.patch('/:id/cancelar', cancelarVenda);  // soft delete (só dono)
 
 export default router;

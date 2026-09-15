@@ -32,4 +32,9 @@ export const vendasService = {
   },
   detalhar: (id) => api.get(`/vendas/${id}`),
   cancelar: (id) => api.patch(`/vendas/${id}/cancelar`),
+
+  // Cancela a venda e devolve { cancelada, molde } para reabri-la
+  // preenchida em Nova Venda. Não é edição: a original fica no histórico
+  // como cancelada e a correção entra como venda nova.
+  corrigir: (id) => api.post(`/vendas/${id}/corrigir`),
 };

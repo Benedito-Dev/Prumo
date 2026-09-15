@@ -139,13 +139,13 @@ async function suite() {
 
   console.log('\n🧱 PRODUTO — validação');
   await esperaErro(() => produtos.criarProduto({ unidade: 'saco', preco_venda: 1 }),
-    'Nome é obrigatório', 'sem nome');
+    'Informe nome', 'sem nome');
   await esperaErro(() => produtos.criarProduto({ nome: 'X', preco_venda: 1 }),
-    'Unidade é obrigatória', 'sem unidade');
+    'Informe unidade', 'sem unidade');
   await esperaErro(() => produtos.criarProduto({ nome: 'X', unidade: 'caixa', preco_venda: 1 }),
     `Unidade inválida. Use: ${produtos.UNIDADES_VALIDAS.join(', ')}`, 'unidade inválida');
   await esperaErro(() => produtos.criarProduto({ nome: 'X', unidade: 'saco' }),
-    'Preço de venda é obrigatório', 'sem preço');
+    'Informe preço de venda', 'sem preço');
   await esperaErro(() => produtos.criarProduto({ nome: 'X', unidade: 'saco', preco_venda: -1 }),
     'Preço de venda não pode ser negativo', 'preço negativo');
   await esperaErro(() => produtos.criarProduto({
@@ -185,9 +185,9 @@ async function suite() {
 
   console.log('\n👤 CLIENTE — validação');
   await esperaErro(() => clientes.criarCliente({ nome: 'X' }),
-    'Nome e telefone são obrigatórios', 'sem telefone');
+    'Informe telefone', 'sem telefone');
   await esperaErro(() => clientes.criarCliente({ telefone: '9' }),
-    'Nome e telefone são obrigatórios', 'sem nome');
+    'Informe nome', 'sem nome');
   await esperaErro(() => clientes.criarCliente({ nome: 'X', telefone: '9', tipo: 'vip' }),
     `Tipo inválido. Use: ${clientes.TIPOS_VALIDOS.join(', ')}`, 'tipo inválido');
   await esperaErro(() => clientes.exigirCliente('00000000-0000-0000-0000-000000000000'),
@@ -767,8 +767,10 @@ async function suite() {
   const semPagamento = await tool('criar_venda', {
     itens: [{ produto_id: pv1.id, quantidade: 1 }], forma_pagamento: 'cheque',
   });
-  ok(semPagamento.ok === false && /forma_pagamento/.test(semPagamento.erro),
-    'forma de pagamento inválida é recusada');
+  // A mensagem diz "forma de pagamento", não "forma_pagamento": nome de
+  // coluna não é texto de tela, e o modelo repassa isto ao usuário.
+  ok(semPagamento.ok === false && /forma de pagamento/i.test(semPagamento.erro),
+    'forma de pagamento inválida é recusada', JSON.stringify(semPagamento));
 
   const semItem = await tool('criar_venda', { itens: [], forma_pagamento: 'dinheiro' });
   ok(semItem.ok === false, 'venda sem item é recusada');

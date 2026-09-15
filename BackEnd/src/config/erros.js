@@ -24,11 +24,18 @@ export const conflito = (mensagem) =>
   new ErroNegocio(mensagem, { status: 409, codigo: 'conflito' });
 
 // Responde uma requisição a partir de um erro qualquer.
-// ErroNegocio vira o status que ele mesmo declarou; o resto é 500 com o
-// detalhe da exceção — exatamente o formato que os controllers já usavam.
+// ErroNegocio vira o status que ele mesmo declarou; o resto é 500 com a
+// mensagem amigável — e só ela.
+//
+// O `erro.message` de uma exceção inesperada quase sempre vem do driver do
+// Postgres: nome de tabela, de coluna, texto de constraint. Isso não pode
+// chegar à tela (dá a quem não é técnico um texto que não ajuda) nem ao
+// modelo do Zé (que passaria a redigir resposta em cima de detalhe de
+// schema). Vai para o log do servidor, que é onde ele serve para depurar.
 export function responderErro(res, erro, mensagem500) {
   if (erro instanceof ErroNegocio) {
     return res.status(erro.status).json({ erro: erro.message });
   }
-  return res.status(500).json({ erro: mensagem500, detalhe: erro.message });
+  console.error(`[erro] ${mensagem500}:`, erro);
+  return res.status(500).json({ erro: mensagem500 });
 }

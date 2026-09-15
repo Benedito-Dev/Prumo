@@ -1,5 +1,6 @@
 // Controller de categorias (RF09).
 import { query } from '../config/db.js';
+import { responderErro } from '../config/erros.js';
 
 // GET /api/categorias
 export async function listarCategorias(req, res) {
@@ -7,7 +8,7 @@ export async function listarCategorias(req, res) {
     const resultado = await query('SELECT * FROM categoria ORDER BY nome');
     res.json(resultado.rows);
   } catch (erro) {
-    res.status(500).json({ erro: 'Falha ao listar categorias', detalhe: erro.message });
+    responderErro(res, erro, 'Falha ao listar categorias');
   }
 }
 
@@ -22,7 +23,7 @@ export async function buscarCategoria(req, res) {
     }
     res.json(resultado.rows[0]);
   } catch (erro) {
-    res.status(500).json({ erro: 'Falha ao buscar categoria', detalhe: erro.message });
+    responderErro(res, erro, 'Falha ao buscar categoria');
   }
 }
 
@@ -45,7 +46,7 @@ export async function criarCategoria(req, res) {
     if (erro.code === '23505') {
       return res.status(409).json({ erro: 'Já existe uma categoria com esse nome' });
     }
-    res.status(500).json({ erro: 'Falha ao criar categoria', detalhe: erro.message });
+    responderErro(res, erro, 'Falha ao criar categoria');
   }
 }
 
@@ -72,7 +73,7 @@ export async function atualizarCategoria(req, res) {
     if (erro.code === '23505') {
       return res.status(409).json({ erro: 'Já existe uma categoria com esse nome' });
     }
-    res.status(500).json({ erro: 'Falha ao atualizar categoria', detalhe: erro.message });
+    responderErro(res, erro, 'Falha ao atualizar categoria');
   }
 }
 
@@ -93,6 +94,6 @@ export async function removerCategoria(req, res) {
         erro: 'Categoria possui produtos e não pode ser removida',
       });
     }
-    res.status(500).json({ erro: 'Falha ao remover categoria', detalhe: erro.message });
+    responderErro(res, erro, 'Falha ao remover categoria');
   }
 }

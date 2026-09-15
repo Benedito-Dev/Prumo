@@ -88,7 +88,11 @@ CREATE TABLE venda (
     status           VARCHAR(12)   NOT NULL DEFAULT 'concluida'
                      CHECK (status IN ('concluida','cancelada')),
     vendida_em       TIMESTAMP     NOT NULL DEFAULT NOW(),
-    cancelada_em     TIMESTAMP
+    cancelada_em     TIMESTAMP,
+    -- Vencimento do fiado. NULL = usa o prazo padrão da loja
+    -- (LOJA_PRAZO_FIADO_DIAS) sobre vendida_em, que é o combinado da
+    -- maioria das vendas. Só quem negociou data diferente preenche.
+    vence_em         DATE
 );
 
 -- Filtros de período do painel (RF21) e rankings
@@ -96,6 +100,9 @@ CREATE INDEX idx_venda_data    ON venda (vendida_em);
 CREATE INDEX idx_venda_cliente ON venda (cliente_id);
 CREATE INDEX idx_venda_usuario ON venda (usuario_id);
 CREATE INDEX idx_venda_status  ON venda (status);
+-- Cobrança filtra os vencidos; sem índice vira varredura na tabela que
+-- mais cresce. Parcial: só as vendas com data negociada entram.
+CREATE INDEX idx_venda_vence_em ON venda (vence_em) WHERE vence_em IS NOT NULL;
 
 
 -- ============================================================

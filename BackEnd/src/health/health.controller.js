@@ -12,11 +12,14 @@ export async function healthCheck(req, res) {
       hora_do_banco: resultado.rows[0].agora,
     });
   } catch (erro) {
+    // Rota pública: o detalhe da falha vai só para o log. Para quem
+    // consulta de fora, "sem conexão" já é o diagnóstico — a mensagem do
+    // driver diria a um desconhecido o host e o nome do banco.
+    console.error('[erro] Health-check não alcançou o banco:', erro);
     res.status(503).json({
       status: 'erro',
       api: 'no ar',
       banco: 'sem conexão',
-      detalhe: erro.message,
     });
   }
 }

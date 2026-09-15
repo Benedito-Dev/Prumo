@@ -1,6 +1,7 @@
 // Controller do painel de indicadores (RF16–RF22).
 // Somente leitura. Todas as consultas ignoram vendas canceladas.
 import { query } from '../config/db.js';
+import { responderErro } from '../config/erros.js';
 import { resolverPeriodo, mesCorrenteEAnterior } from './periodo.js';
 
 // GET /api/painel/faturamento
@@ -34,7 +35,7 @@ export async function faturamento(req, res) {
       vendas_mes_atual: Number(vendas_mes_atual),
     });
   } catch (erro) {
-    res.status(500).json({ erro: 'Falha ao calcular faturamento', detalhe: erro.message });
+    responderErro(res, erro, 'Falha ao calcular faturamento');
   }
 }
 
@@ -85,7 +86,7 @@ export async function resumo(req, res) {
       },
     });
   } catch (erro) {
-    res.status(500).json({ erro: 'Falha ao calcular resumo', detalhe: erro.message });
+    responderErro(res, erro, 'Falha ao calcular resumo');
   }
 }
 
@@ -117,7 +118,7 @@ export async function rankingClientes(req, res) {
       qtd_compras: Number(row.qtd_compras),
     })));
   } catch (erro) {
-    res.status(500).json({ erro: 'Falha ao montar ranking de clientes', detalhe: erro.message });
+    responderErro(res, erro, 'Falha ao montar ranking de clientes');
   }
 }
 
@@ -149,7 +150,7 @@ export async function produtosMaisVendidos(req, res) {
       valor_total: Number(row.valor_total),
     })));
   } catch (erro) {
-    res.status(500).json({ erro: 'Falha ao listar produtos mais vendidos', detalhe: erro.message });
+    responderErro(res, erro, 'Falha ao listar produtos mais vendidos');
   }
 }
 
@@ -178,7 +179,69 @@ export async function vendasPorVendedor(req, res) {
       qtd_vendas: Number(row.qtd_vendas),
     })));
   } catch (erro) {
-    res.status(500).json({ erro: 'Falha ao listar vendas por vendedor', detalhe: erro.message });
+    responderErro(res, erro, 'Falha ao listar vendas por vendedor');
+  }
+}
+
+// GET /api/painel/meu-resumo?periodo=mes
+// O desempenho do PRÓPRIO usuário logado — a única rota do painel aberta
+// ao vendedor. Todas as outras expõem números da loja (faturamento, ranking
+// de clientes, quanto cada colega vendeu) e são restritas ao dono.
+//
+// O filtro vem de req.usuario.id, nunca da query string: aceitar um
+// usuario_id do cliente devolveria a um vendedor o desempenho de outro,
+// que é exatamente o que esta rota existe para não fazer.
+export async function meuResumo(req, res) {
+  try {
+    const { de, ate } = resolverPeriodo(req.query);
+
+    const sql = `
+      SELECT
+        COALESCE(SUM(valor_total), 0) AS total,
+        COUNT(*)                      AS qtd_vendas,
+        COALESCE(AVG(valor_total), 0) AS ticket_medio
+      FROM venda
+      WHERE status = 'concluida'
+        AND usuario_id = $1
+        AND vendida_em >= $2 AND vendida_em < $3
+    `;
+    const r = await query(sql, [req.usuario.id, de, ate]);
+    const a = r.rows[0];
+
+    res.json({
+      periodo: { de, ate },
+      total: Number(a.total),
+      qtd_vendas: Number(a.qtd_vendas),
+      ticket_medio: Number(Number(a.ticket_medio).toFixed(2)),
+    });
+  } catch (erro) {
+    responderErro(res, erro, 'Falha ao calcular seu resumo');
+  }
+}
+
+// GET /api/painel/minha-evolucao?periodo=mes
+// Faturamento diário do próprio vendedor, para o gráfico da tela dele.
+export async function minhaEvolucao(req, res) {
+  try {
+    const { de, ate } = resolverPeriodo(req.query);
+    const sql = `
+      SELECT
+        DATE(vendida_em) AS dia,
+        SUM(valor_total) AS total
+      FROM venda
+      WHERE status = 'concluida'
+        AND usuario_id = $1
+        AND vendida_em >= $2 AND vendida_em < $3
+      GROUP BY DATE(vendida_em)
+      ORDER BY dia
+    `;
+    const r = await query(sql, [req.usuario.id, de, ate]);
+    res.json(r.rows.map((row) => ({
+      dia: row.dia,
+      total: Number(row.total),
+    })));
+  } catch (erro) {
+    responderErro(res, erro, 'Falha ao montar sua evolução');
   }
 }
 
@@ -202,6 +265,6 @@ export async function evolucaoFaturamento(req, res) {
       total: Number(row.total),
     })));
   } catch (erro) {
-    res.status(500).json({ erro: 'Falha ao montar evolução do faturamento', detalhe: erro.message });
+    responderErro(res, erro, 'Falha ao montar evolução do faturamento');
   }
 }

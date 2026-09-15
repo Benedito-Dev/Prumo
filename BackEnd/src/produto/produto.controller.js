@@ -26,7 +26,7 @@ export async function buscarProduto(req, res) {
 // POST /api/produtos
 export async function criarProduto(req, res) {
   try {
-    res.status(201).json(await produtos.criarProduto(req.body));
+    res.status(201).json(await produtos.criarProduto(req.body, req.usuario));
   } catch (erro) {
     responderErro(res, erro, 'Falha ao criar produto');
   }
@@ -36,7 +36,7 @@ export async function criarProduto(req, res) {
 // Substituição total: campo omitido vira NULL (a tela manda a ficha inteira).
 export async function atualizarProduto(req, res) {
   try {
-    res.json(await produtos.atualizarProduto(req.params.id, req.body));
+    res.json(await produtos.atualizarProduto(req.params.id, req.body, req.usuario));
   } catch (erro) {
     responderErro(res, erro, 'Falha ao atualizar produto');
   }
@@ -46,7 +46,7 @@ export async function atualizarProduto(req, res) {
 // Se o produto já tem vendas, não apaga — a FK barra e vira 409.
 export async function removerProduto(req, res) {
   try {
-    await produtos.removerProduto(req.params.id);
+    await produtos.removerProduto(req.params.id, req.usuario);
     res.status(204).send();
   } catch (erro) {
     responderErro(res, erro, 'Falha ao remover produto');

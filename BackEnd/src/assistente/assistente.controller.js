@@ -60,6 +60,10 @@ export async function perguntar(req, res) {
       const status = erro.status === 503 || erro.status === 504 ? erro.status : 502;
       return res.status(status).json({ erro: erro.message });
     }
-    res.status(500).json({ erro: 'Falha ao consultar o assistente', detalhe: erro.message });
+    // Sem `detalhe`: a resposta do Zé é lida na tela e pode voltar como
+    // contexto numa próxima pergunta. Mensagem de driver aqui acabaria
+    // dentro da conversa com o modelo.
+    console.error('[erro] Falha ao consultar o assistente:', erro);
+    res.status(500).json({ erro: 'Falha ao consultar o assistente' });
   }
 }

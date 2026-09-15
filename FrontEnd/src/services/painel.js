@@ -10,4 +10,10 @@ export const painelService = {
     api.get(`/painel/produtos-mais-vendidos?periodo=${periodo}&limite=${limite}`),
   evolucaoFaturamento: (periodo = 'mes') =>
     api.get(`/painel/evolucao-faturamento?periodo=${periodo}`),
+
+  // --- Do próprio usuário (únicas abertas ao vendedor) ---
+  // As demais são restritas ao dono: expõem faturamento da loja, ranking de
+  // clientes e quanto cada colega vendeu. Estas filtram pelo id do token.
+  meuResumo: (periodo = 'mes') => api.get(`/painel/meu-resumo?periodo=${periodo}`),
+  minhaEvolucao: (periodo = 'mes') => api.get(`/painel/minha-evolucao?periodo=${periodo}`),
 };

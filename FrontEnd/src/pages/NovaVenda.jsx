@@ -1,9 +1,18 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, Search, Plus, Trash2, UserPlus, X, Check } from 'lucide-react';
 import LayoutApp from '../components/LayoutApp';
+import AcoesRecibo from '../components/AcoesRecibo';
 import { vendasService } from '../services/vendas';
+import { fiadosService } from '../services/fiados';
 import { moeda } from '../utils/formato';
+import {
+  calcularVenda,
+  validarVenda,
+  montarPayload,
+  adicionarItem,
+} from '../utils/calculoVenda';
+import * as rascunho from '../utils/rascunhoVenda';
 
 const PAGAMENTOS = [
   { id: 'dinheiro', rotulo: 'Dinheiro' },
@@ -14,6 +23,11 @@ const PAGAMENTOS = [
 
 export default function NovaVenda() {
   const navigate = useNavigate();
+  // Molde de uma venda que está sendo corrigida (veio de Vendas, via
+  // navigate state). Fica fora da URL de propósito: recarregar a página
+  // não deve reabrir uma correção que já foi salva.
+  const { state } = useLocation();
+  const correcao = state?.correcao || null;
 
   const [cliente, setCliente] = useState(null); // null = Consumidor
   const [itens, setItens] = useState([]); // { produto_id, nome, unidade, quantidade, preco_unitario }
@@ -25,40 +39,152 @@ export default function NovaVenda() {
   const [vendaSalva, setVendaSalva] = useState(null);
   const [tipoDesconto, setTipoDesconto] = useState('valor'); // 'valor' | 'percentual'
   const [descontoInput, setDescontoInput] = useState('');
+  // Dívida do cliente escolhido — alimenta o aviso de fiado em aberto.
+  const [divida, setDivida] = useState(null);
+  // Rascunho encontrado ao abrir a tela (venda interrompida por queda de
+  // internet, aba fechada, PC reiniciado). Fica em espera até a pessoa
+  // decidir: restaurar não pode acontecer sozinho, senão ela começa uma
+  // venda nova e encontra itens que não colocou.
+  const [rascunhoAchado, setRascunhoAchado] = useState(null);
+  const [semConexao, setSemConexao] = useState(false);
 
-  const subtotal = itens.reduce((s, i) => s + Number(i.quantidade || 0) * Number(i.preco_unitario || 0), 0);
-  const qtdTotal = itens.reduce((s, i) => s + Number(i.quantidade || 0), 0);
+  // Ao abrir: procura venda interrompida. Não restaura sozinho — só
+  // oferece. Numa correção de venda o molde já preenche a tela, então
+  // nem pergunta.
+  useEffect(() => {
+    if (correcao) return;
+    const achado = rascunho.carregar();
+    if (achado) setRascunhoAchado(achado);
+  }, [correcao]);
 
-  // desconto em R$ (converte de % se for o caso), limitado ao subtotal
-  const descontoBruto =
-    tipoDesconto === 'percentual'
-      ? (subtotal * (Number(descontoInput) || 0)) / 100
-      : Number(descontoInput) || 0;
-  const desconto = Math.min(Math.max(descontoBruto, 0), subtotal);
-  const total = subtotal - desconto;
-  // troco (só faz sentido no dinheiro): recebido − total
-  const troco = Number(recebido) - total;
+  // Salva a cada mudança. É barato (localStorage é síncrono e local) e
+  // cobre o caso real: a queda não avisa antes de acontecer.
+  //
+  // `vendaSalva` sai fora: depois de gravada, a venda não é mais rascunho.
+  useEffect(() => {
+    if (vendaSalva || rascunhoAchado) return;
+    rascunho.salvar({ cliente, itens, pagamento, descontoInput, tipoDesconto });
+  }, [cliente, itens, pagamento, descontoInput, tipoDesconto, vendaSalva, rascunhoAchado]);
+
+  // O navegador avisa quando a conexão volta ou cai. É mais confiável que
+  // adivinhar pelo erro da requisição, e permite tirar o aviso da tela
+  // sozinho quando a internet volta.
+  useEffect(() => {
+    const online = () => setSemConexao(false);
+    const offline = () => setSemConexao(true);
+    window.addEventListener('online', online);
+    window.addEventListener('offline', offline);
+    // Estado inicial: a tela pode abrir já sem conexão.
+    if (navigator.onLine === false) setSemConexao(true);
+    return () => {
+      window.removeEventListener('online', online);
+      window.removeEventListener('offline', offline);
+    };
+  }, []);
+
+  function restaurarRascunho() {
+    const r = rascunhoAchado;
+    setCliente(r.cliente ?? null);
+    setItens(r.itens ?? []);
+    setPagamento(r.pagamento ?? 'dinheiro');
+    setDescontoInput(r.descontoInput ?? '');
+    setTipoDesconto(r.tipoDesconto ?? 'valor');
+    setRascunhoAchado(null);
+  }
+
+  function descartarRascunho() {
+    rascunho.limpar();
+    setRascunhoAchado(null);
+  }
+
+  // Correção: preenche a tela com o molde da venda cancelada.
+  //
+  // A unidade de cada item vem do catálogo ATUAL, não do molde — é o que
+  // faz um produto desativado desde a venda aparecer como problema aqui
+  // em vez de ser revendido em silêncio.
+  const [itensSumidos, setItensSumidos] = useState([]);
+  useEffect(() => {
+    if (!correcao) return;
+    const m = correcao.molde;
+
+    if (m.cliente_id) {
+      setCliente({
+        id: m.cliente_id,
+        nome: m.cliente_nome,
+        telefone: m.cliente_telefone,
+      });
+    }
+    setPagamento(m.forma_pagamento);
+    if (Number(m.desconto) > 0) {
+      setTipoDesconto('valor');
+      setDescontoInput(String(m.desconto));
+    }
+
+    let ativo = true;
+    vendasService
+      .buscarProdutos()
+      .then((catalogo) => {
+        if (!ativo) return;
+        const porId = new Map(catalogo.map((p) => [p.id, p]));
+        const encontrados = [];
+        const sumidos = [];
+        for (const item of m.itens) {
+          const atual = porId.get(item.produto_id);
+          if (!atual) {
+            sumidos.push(item.produto_nome);
+            continue;
+          }
+          encontrados.push({
+            produto_id: item.produto_id,
+            nome: atual.nome,
+            unidade: atual.unidade,
+            quantidade: item.quantidade,
+            // O preço praticado na venda original, não o de tabela: se
+            // houve negociação no balcão, ela é o que se está corrigindo.
+            preco_unitario: item.preco_unitario,
+          });
+        }
+        setItens(encontrados);
+        setItensSumidos(sumidos);
+      })
+      .catch(() => {
+        if (ativo) setErro('Não foi possível carregar os itens da venda.');
+      });
+    return () => {
+      ativo = false;
+    };
+  }, [correcao]);
+
+  // Escolheu um cliente? consulta se ele tem fiado em aberto.
+  // Falha em silêncio de propósito: não achar a dívida não pode impedir a
+  // venda de acontecer — a meta dos 30 segundos vale mesmo quando a
+  // consulta falha.
+  useEffect(() => {
+    if (!cliente?.id) {
+      setDivida(null);
+      return;
+    }
+    let cancelado = false;
+    fiadosService
+      .dividaDoCliente(cliente.id)
+      .then((d) => {
+        if (!cancelado) setDivida(Number(d?.total) > 0 ? d : null);
+      })
+      .catch(() => {
+        if (!cancelado) setDivida(null);
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [cliente?.id]);
+
+  // As contas moram em utils/calculoVenda.js — módulo puro, com suíte
+  // própria (calculoVenda.test.mjs). Aqui a tela só consome o resultado.
+  const { subtotal, desconto, total, quantidadeTotal: qtdTotal, troco } =
+    calcularVenda({ itens, descontoInput, tipoDesconto, recebido });
 
   function adicionarProduto(p) {
-    // se já existe, incrementa; senão adiciona
-    setItens((atual) => {
-      const idx = atual.findIndex((i) => i.produto_id === p.id);
-      if (idx >= 0) {
-        const copia = [...atual];
-        copia[idx] = { ...copia[idx], quantidade: Number(copia[idx].quantidade) + 1 };
-        return copia;
-      }
-      return [
-        ...atual,
-        {
-          produto_id: p.id,
-          nome: p.nome,
-          unidade: p.unidade,
-          quantidade: 1,
-          preco_unitario: Number(p.preco_venda),
-        },
-      ];
-    });
+    setItens((atual) => adicionarItem(atual, p));
   }
 
   function atualizarItem(idx, campo, valor) {
@@ -75,31 +201,28 @@ export default function NovaVenda() {
 
   async function salvar() {
     setErro('');
-    if (itens.length === 0) {
-      setErro('Adicione ao menos um item.');
+    const problema = validarVenda({ itens });
+    if (problema) {
+      setErro(problema);
       return;
-    }
-    for (const i of itens) {
-      if (Number(i.quantidade) <= 0) return setErro('Quantidade deve ser maior que zero.');
-      if (Number(i.preco_unitario) < 0) return setErro('Preço não pode ser negativo.');
     }
 
     setSalvando(true);
     try {
-      // Quem vendeu sai do token no back — não se manda usuario_id daqui.
-      const venda = await vendasService.criarVenda({
-        cliente_id: cliente?.id ?? null,
-        forma_pagamento: pagamento,
-        desconto: Number(desconto.toFixed(2)),
-        itens: itens.map((i) => ({
-          produto_id: i.produto_id,
-          quantidade: Number(i.quantidade),
-          preco_unitario: Number(i.preco_unitario),
-        })),
-      });
+      const venda = await vendasService.criarVenda(
+        montarPayload({ cliente, itens, pagamento, descontoInput, tipoDesconto })
+      );
+      // Gravou no servidor: o rascunho cumpriu o papel e sai de cena.
+      // Mantê-lo faria a próxima venda começar com os itens desta.
+      rascunho.limpar();
       setVendaSalva(venda); // mostra a confirmação
     } catch (e) {
-      setErro(e.message || 'Falha ao salvar a venda.');
+      // Distingue "sem internet" de "o sistema recusou": a primeira pede
+      // tentar de novo, a segunda pede corrigir algo. E o rascunho
+      // continua salvo — a mensagem diz isso, para a pessoa não achar que
+      // perdeu o trabalho.
+      setErro(rascunho.mensagemDeFalha(e));
+      if (rascunho.ehFalhaDeRede(e)) setSemConexao(true);
     } finally {
       setSalvando(false);
     }
@@ -107,6 +230,9 @@ export default function NovaVenda() {
 
   // reinicia a tela para uma nova venda
   function novaVenda() {
+    // A venda anterior já foi gravada; o rascunho dela não pode
+    // reaparecer na próxima abertura da tela.
+    rascunho.limpar();
     setCliente(null);
     setItens([]);
     setPagamento('dinheiro');
@@ -133,6 +259,13 @@ export default function NovaVenda() {
             <p className="text-[40px] font-bold tabular-nums text-nivel my-5">
               {moeda(vendaSalva.valor_total)}
             </p>
+
+            {/* O recibo vem antes de "Nova venda": é agora, com o cliente
+                ainda no balcão, que o papel serve para alguma coisa. */}
+            <div className="mb-3">
+              <AcoesRecibo venda={vendaSalva} telefoneCliente={cliente?.telefone} />
+            </div>
+
             <div className="flex gap-2">
               <button
                 onClick={() => navigate('/')}
@@ -155,7 +288,7 @@ export default function NovaVenda() {
 
   return (
     <LayoutApp
-      titulo="Nova venda"
+      titulo={correcao ? 'Corrigir venda' : 'Nova venda'}
       acao={
         <button
           onClick={() => navigate('/')}
@@ -165,6 +298,72 @@ export default function NovaVenda() {
         </button>
       }
     >
+      {/* Venda interrompida. Pergunta em vez de restaurar sozinho: quem
+          abriu a tela para vender de novo estranharia encontrar itens que
+          não colocou. */}
+      {rascunhoAchado && (
+        <div className="max-w-[1280px] mx-auto mb-4 rounded-p border border-trena/40 bg-trena/5 px-4 py-3">
+          <p className="text-[13.5px] font-semibold text-grafite">
+            Você tinha uma venda em andamento
+          </p>
+          <p className="text-[12.5px] text-grafite-medio mt-0.5">
+            {rascunhoAchado.itens.length} item(ns)
+            {rascunhoAchado.cliente?.nome ? ` · ${rascunhoAchado.cliente.nome}` : ''}
+            {' · guardada '}
+            {rascunho.descreverIdade(rascunhoAchado.salvo_em)}.
+          </p>
+          <div className="flex gap-2 mt-2.5">
+            <button
+              onClick={restaurarRascunho}
+              className="h-11 px-4 rounded-p bg-trena hover:bg-trena-escuro text-white text-[13.5px] font-bold"
+            >
+              Continuar essa venda
+            </button>
+            <button
+              onClick={descartarRascunho}
+              className="h-11 px-4 rounded-p border border-linha text-[13px] font-semibold text-grafite-medio hover:text-grafite"
+            >
+              Começar do zero
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Sem conexão. O navegador avisa quando cai e quando volta, então
+          este aviso some sozinho — a pessoa não precisa recarregar para
+          descobrir que já dá para salvar. */}
+      {semConexao && (
+        <div className="max-w-[1280px] mx-auto mb-4 rounded-p border border-prumo/40 bg-prumo/5 px-4 py-3">
+          <p className="text-[13.5px] font-semibold text-prumo">
+            Sem conexão com o sistema
+          </p>
+          <p className="text-[12.5px] text-grafite-medio mt-0.5">
+            Pode continuar lançando: o que você digitar fica guardado aqui e é
+            só tocar em concluir quando a internet voltar.
+          </p>
+        </div>
+      )}
+
+      {/* Correção em andamento. A venda antiga JÁ foi cancelada quando
+          esta tela abriu — dizer isso evita que a pessoa saia daqui
+          achando que a original continua valendo. */}
+      {correcao && (
+        <div className="max-w-[1280px] mx-auto mb-4 rounded-p border border-trena/40 bg-trena/5 px-4 py-3">
+          <p className="text-[13.5px] font-semibold text-grafite">
+            Corrigindo a venda {String(correcao.cancelada).slice(0, 8).toUpperCase()}
+          </p>
+          <p className="text-[12.5px] text-grafite-medio mt-0.5">
+            A venda anterior foi cancelada. Ajuste o que estava errado e salve —
+            isto entra como uma venda nova.
+          </p>
+          {itensSumidos.length > 0 && (
+            <p className="text-[12.5px] text-prumo font-semibold mt-1.5">
+              Fora do catálogo, não foram trazidos: {itensSumidos.join(', ')}.
+            </p>
+          )}
+        </div>
+      )}
+
       {/* pb-24 até lg: espaço para a barra fixa não cobrir o fim do resumo */}
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-4 pb-24 lg:pb-0 lg:h-full lg:min-h-[560px] max-w-[1280px] mx-auto">
         {/* ---- COLUNA ESQUERDA: cliente + itens ---- */}
@@ -192,6 +391,20 @@ export default function NovaVenda() {
               <BuscaCliente
                 onSelecionar={setCliente}
                 onNovoCliente={() => setModalCliente(true)}
+              />
+            )}
+
+            {/* Fiado em aberto deste cliente. Aparece aqui, no momento em
+                que ele é escolhido, em vez de numa tela de devedores: quem
+                atende sabe da conta de quem está na frente dele, e não do
+                mapa de quem deve para a loja. */}
+            {cliente && divida && (
+              <AvisoDivida
+                divida={divida}
+                onAbatido={(restante) =>
+                  setDivida(restante > 0 ? { ...divida, total: restante } : null)
+                }
+                clienteId={cliente.id}
               />
             )}
           </div>
@@ -353,8 +566,10 @@ export default function NovaVenda() {
                     </button>
                   ))}
                 </div>
-                {/* troco calculado */}
-                {recebido !== '' && (
+                {/* Troco calculado. `troco` é null enquanto ninguém
+                    digitou — sem isso a tela mostraria "Falta R$ 300,00"
+                    com o campo ainda em branco. */}
+                {troco !== null && (
                   <div
                     className={`flex items-center justify-between rounded-p px-3 py-2 ${
                       troco < 0 ? 'bg-prumo/10' : 'bg-nivel/10'
@@ -422,6 +637,136 @@ export default function NovaVenda() {
         />
       )}
     </LayoutApp>
+  );
+}
+
+// ---------- Aviso de fiado em aberto ----------
+
+// O vendedor não tem a tela de Fiados: é por aqui que ele descobre que o
+// cliente à sua frente tem conta, e é por aqui que ele recebe.
+//
+// Mostra o valor e deixa abater na hora (abate da dívida mais antiga para a
+// mais nova, no servidor). Não bloqueia nada: se a pessoa quiser vender
+// assim mesmo, vende — o aviso informa, não impede.
+function AvisoDivida({ divida, clienteId, onAbatido }) {
+  const [abrindo, setAbrindo] = useState(false);
+  const [valor, setValor] = useState('');
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState('');
+  const [recibo, setRecibo] = useState(null);
+
+  const total = Number(divida.total) || 0;
+  const desde = divida.mais_antiga
+    ? new Date(divida.mais_antiga).toLocaleDateString('pt-BR')
+    : null;
+
+  async function abater() {
+    const v = Number(valor);
+    if (!v || v <= 0) {
+      setErro('Informe quanto ele está pagando.');
+      return;
+    }
+    if (v > total + 0.009) {
+      setErro(`O valor não pode passar de ${moeda(total)}.`);
+      return;
+    }
+    setSalvando(true);
+    setErro('');
+    try {
+      const r = await fiadosService.pagarCliente(clienteId, v);
+      // `total_devido_depois` vem do servidor, que fez a conta na transação.
+      const restante = Number(r?.total_devido_depois ?? total - v);
+      setRecibo({ pago: v, restante });
+      setAbrindo(false);
+      setValor('');
+      onAbatido(restante);
+    } catch (e) {
+      setErro(e.message);
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  // Depois de receber, o aviso vira confirmação — o vendedor precisa poder
+  // dizer ao cliente o que ficou registrado.
+  if (recibo) {
+    return (
+      <div className="mt-3 rounded-p border border-nivel/30 bg-nivel/5 px-3 py-2.5">
+        <p className="text-[13px] font-semibold text-nivel">
+          Recebido {moeda(recibo.pago)}
+        </p>
+        <p className="text-[12px] text-grafite-medio mt-0.5">
+          {recibo.restante > 0
+            ? `Ainda restam ${moeda(recibo.restante)} em aberto.`
+            : 'A conta deste cliente está quitada.'}
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-3 rounded-p border border-trena/40 bg-trena/5 px-3 py-2.5">
+      <p className="text-[13px] font-semibold text-grafite">
+        Este cliente tem {moeda(total)} em aberto
+      </p>
+      <p className="text-[12px] text-grafite-medio mt-0.5">
+        {divida.qtd_dividas > 1
+          ? `${divida.qtd_dividas} compras no fiado`
+          : 'Uma compra no fiado'}
+        {desde ? ` · desde ${desde}` : ''}
+        {' · em caso de dúvida, consulte o dono.'}
+      </p>
+
+      {abrindo ? (
+        <div className="mt-2.5 flex flex-col gap-2">
+          <div className="flex items-center gap-2">
+            <span className="text-[13px] text-grafite-medio">R$</span>
+            <input
+              type="number"
+              inputMode="decimal"
+              step="0.01"
+              autoFocus
+              value={valor}
+              onChange={(e) => setValor(e.target.value)}
+              placeholder={String(total.toFixed(2))}
+              className="flex-1 min-w-0 h-11 px-3 rounded-p border border-linha bg-superficie text-[15px] tabular-nums"
+            />
+            <button
+              onClick={() => setValor(String(total.toFixed(2)))}
+              className="h-11 px-3 rounded-p border border-linha text-[12.5px] font-semibold text-grafite-medio hover:text-grafite whitespace-nowrap"
+            >
+              Tudo
+            </button>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={abater}
+              disabled={salvando}
+              className="flex-1 h-11 rounded-p bg-trena hover:bg-trena-escuro disabled:opacity-60 text-white font-bold text-[13.5px]"
+            >
+              {salvando ? 'Registrando…' : 'Confirmar recebimento'}
+            </button>
+            <button
+              onClick={() => {
+                setAbrindo(false);
+                setErro('');
+              }}
+              className="h-11 px-3 rounded-p text-[13px] font-semibold text-grafite-medio hover:text-grafite"
+            >
+              Cancelar
+            </button>
+          </div>
+          {erro && <p className="text-[12.5px] text-prumo font-semibold">{erro}</p>}
+        </div>
+      ) : (
+        <button
+          onClick={() => setAbrindo(true)}
+          className="mt-2 h-11 px-3 rounded-p border border-trena/50 text-[13px] font-bold text-grafite hover:bg-trena/10"
+        >
+          Abater da dívida
+        </button>
+      )}
+    </div>
   );
 }
 

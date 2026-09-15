@@ -10,14 +10,25 @@
 // dentro um nome nunca entra.
 import { pool, query } from '../config/db.js';
 import { ErroNegocio, naoEncontrado, conflito } from '../config/erros.js';
+import {
+  numeroValido,
+  uuidValido,
+  listaValida,
+  opcaoValida,
+  MAX_ITENS_VENDA,
+} from '../config/validar.js';
 
 export const FORMAS_PAGAMENTO = ['dinheiro', 'pix', 'cartao', 'fiado'];
 
 // Cabeçalho da venda com os nomes para exibição.
+// O telefone do cliente vem junto porque o recibo é mandado no WhatsApp a
+// partir da tela de vendas — sem ele, o vendedor teria de procurar o
+// contato na lista do celular a cada segunda via.
 const SELECT_VENDA = `
   SELECT v.*,
-         c.nome AS cliente_nome,
-         u.nome AS usuario_nome
+         c.nome     AS cliente_nome,
+         c.telefone AS cliente_telefone,
+         u.nome     AS usuario_nome
     FROM venda v
     LEFT JOIN cliente c ON c.id = v.cliente_id
     JOIN usuario u ON u.id = v.usuario_id
@@ -26,7 +37,10 @@ const SELECT_VENDA = `
 // Centavo: o dinheiro nunca sai daqui com resto de ponto flutuante.
 const emReais = (n) => Number(Number(n).toFixed(2));
 
-export async function listarVendas({ de, ate, status, cliente_id } = {}) {
+// `usuario_id` restringe a lista a um vendedor. Quem decide passá-lo é o
+// controller, a partir do papel no token — nunca o cliente da requisição,
+// senão bastaria omitir o parâmetro para ver as vendas de todo mundo.
+export async function listarVendas({ de, ate, status, cliente_id, usuario_id } = {}) {
   const condicoes = [];
   const params = [];
 
@@ -46,6 +60,10 @@ export async function listarVendas({ de, ate, status, cliente_id } = {}) {
   if (cliente_id) {
     params.push(cliente_id);
     condicoes.push(`v.cliente_id = $${params.length}`);
+  }
+  if (usuario_id) {
+    params.push(usuario_id);
+    condicoes.push(`v.usuario_id = $${params.length}`);
   }
 
   const where = condicoes.length ? `WHERE ${condicoes.join(' AND ')}` : '';
@@ -74,24 +92,37 @@ export async function exigirVenda(id) {
 // Valida o pedido ANTES de abrir a transação. Separado de criarVenda
 // porque a tool do Zé precisa validar para montar a nota de conferência
 // sem gravar nada.
+//
+// A checagem antiga era `Number(item.quantidade) <= 0`, que NÃO pega
+// lixo: `Number('abc')` é NaN, e NaN não é menor nem maior que zero, então
+// a comparação dá false e o item passava. O NUMERIC do Postgres aceita
+// NaN como valor válido — a venda gravava com valor_total = NaN e
+// contaminava a soma do faturamento inteiro. Daí `numeroValido`, que
+// rejeita NaN e Infinity explicitamente.
 export function validarPedidoDeVenda({ forma_pagamento, itens, desconto }) {
-  if (Number(desconto) < 0) {
-    throw new ErroNegocio('desconto não pode ser negativo');
+  if (desconto !== undefined && desconto !== null && desconto !== '') {
+    numeroValido(desconto, 'desconto', { permitirZero: true });
   }
-  if (!forma_pagamento || !FORMAS_PAGAMENTO.includes(forma_pagamento)) {
-    throw new ErroNegocio(`forma_pagamento inválida. Use: ${FORMAS_PAGAMENTO.join(', ')}`);
-  }
-  if (!Array.isArray(itens) || itens.length === 0) {
-    throw new ErroNegocio('A venda precisa de ao menos um item');
-  }
-  for (const item of itens) {
-    if (!item.produto_id) {
-      throw new ErroNegocio('Cada item precisa de produto_id');
+  // "forma de pagamento", não "forma_pagamento": nome de coluna não é
+  // texto de tela.
+  opcaoValida(forma_pagamento, 'forma de pagamento', FORMAS_PAGAMENTO, { feminino: true });
+  listaValida(itens, 'itens', { max: MAX_ITENS_VENDA });
+
+  itens.forEach((item, i) => {
+    // O número da linha entra na mensagem: numa venda de 8 itens, "o item
+    // 3 está com a quantidade errada" é acionável; "um item está errado"
+    // manda a pessoa conferir tudo de novo.
+    const onde = itens.length > 1 ? ` (item ${i + 1})` : '';
+    if (!item || typeof item !== 'object') {
+      throw new ErroNegocio(`Item inválido${onde}`);
     }
-    if (item.quantidade === undefined || Number(item.quantidade) <= 0) {
-      throw new ErroNegocio('Cada item precisa de quantidade maior que zero');
+    uuidValido(item.produto_id, `produto do item${onde}`);
+    numeroValido(item.quantidade, `quantidade${onde}`);
+    // Preço zero é legítimo — brinde, bonificação, cortesia no balcão.
+    if (item.preco_unitario !== undefined && item.preco_unitario !== null) {
+      numeroValido(item.preco_unitario, `preço${onde}`, { permitirZero: true });
     }
-  }
+  });
 }
 
 // Monta a nota SEM gravar: resolve preço de cada item, soma e aplica
@@ -99,11 +130,18 @@ export function validarPedidoDeVenda({ forma_pagamento, itens, desconto }) {
 // confirmar, e é a mesma conta que criarVenda faz depois — se
 // divergissem, a nota mentiria.
 export async function simularVenda({ itens, desconto = 0 }) {
-  const descontoNum = emReais(Number(desconto) || 0);
+  // A nota do Zé é conferida por gente antes de virar venda; ela não pode
+  // exibir NaN nem números impossíveis.
+  listaValida(itens, 'itens', { max: MAX_ITENS_VENDA });
+  const descontoNum = emReais(
+    desconto ? numeroValido(desconto, 'desconto', { permitirZero: true }) : 0
+  );
   const linhas = [];
   let soma = 0;
 
   for (const item of itens) {
+    uuidValido(item.produto_id, 'produto');
+    numeroValido(item.quantidade, 'quantidade');
     const { rows } = await query(
       'SELECT id, nome, unidade, preco_venda FROM produto WHERE id = $1 AND ativo = TRUE',
       [item.produto_id]
@@ -115,10 +153,9 @@ export async function simularVenda({ itens, desconto = 0 }) {
 
     // Preço negociado no balcão tem prioridade sobre o de tabela (RF12).
     const preco =
-      item.preco_unitario !== undefined
-        ? Number(item.preco_unitario)
+      item.preco_unitario !== undefined && item.preco_unitario !== null
+        ? numeroValido(item.preco_unitario, 'preço', { permitirZero: true })
         : Number(produto.preco_venda);
-    if (preco < 0) throw new ErroNegocio('preco_unitario não pode ser negativo');
 
     const quantidade = Number(item.quantidade);
     const subtotal = emReais(quantidade * preco);
@@ -149,8 +186,16 @@ export async function simularVenda({ itens, desconto = 0 }) {
 
 // Grava venda + itens numa transação: ou tudo, ou nada.
 export async function criarVenda({ cliente_id, usuario_id, forma_pagamento, itens, desconto }) {
-  const descontoNum = Number(desconto) || 0;
-  validarPedidoDeVenda({ forma_pagamento, itens, desconto: descontoNum });
+  // Valida ANTES de converter. `Number('abc') || 0` daria 0 e engoliria a
+  // entrada inválida em silêncio — o pedido seria gravado com desconto
+  // zero, e quem digitou nunca saberia que o valor não entrou.
+  validarPedidoDeVenda({ forma_pagamento, itens, desconto });
+
+  const descontoNum = desconto ? Number(desconto) : 0;
+
+  // UUID malformado chegaria ao SQL e estouraria com 22P02, que o
+  // usuário lê como "Falha inesperada".
+  uuidValido(cliente_id, 'cliente', { obrigatorio: false });
 
   const client = await pool.connect();
   try {
@@ -230,7 +275,26 @@ export async function criarVenda({ cliente_id, usuario_id, forma_pagamento, iten
 // Soft delete (RF14): a venda não some, muda de status. Cancelar duas
 // vezes é barrado — o que torna a operação idempotente do ponto de
 // vista de quem confirma.
+//
+// Venda fiado com pagamento já recebido NÃO pode ser cancelada. As
+// consultas de fiado só enxergam vendas 'concluida', então a dívida
+// sumiria da lista enquanto os registros em pagamento_fiado continuariam
+// apontando para ela: o dinheiro que o cliente entregou viraria um
+// pagamento órfão, sem dívida correspondente, e ninguém perceberia.
+// Quem precisa desfazer isso primeiro devolve o dinheiro.
 export async function cancelarVenda(id) {
+  const recebido = await query(
+    `SELECT COALESCE(SUM(valor), 0) AS pago
+       FROM pagamento_fiado
+      WHERE venda_id = $1`,
+    [id]
+  );
+  if (Number(recebido.rows[0].pago) > 0) {
+    throw conflito(
+      'Esta venda já teve pagamento recebido. Devolva o valor ao cliente antes de cancelar.'
+    );
+  }
+
   const { rows, rowCount } = await query(
     `UPDATE venda
         SET status = 'cancelada', cancelada_em = NOW()
@@ -245,6 +309,86 @@ export async function cancelarVenda(id) {
     throw conflito('Venda já está cancelada');
   }
   return rows[0];
+}
+
+// Quem pode corrigir uma venda, e até quando.
+//
+// O dono corrige qualquer uma. O vendedor corrige só as dele e só no
+// mesmo dia: 99% dos erros aparecem na hora, com o cliente ainda no
+// balcão. Venda de ontem em diante já entrou em faturamento que o dono
+// pode ter conferido — refazê-la sem ele saber mudaria número fechado.
+//
+// Devolve a venda quando pode; lança ErroNegocio explicando quando não.
+export async function exigirVendaCorrigivel(id, usuario) {
+  const venda = await exigirVenda(id);
+
+  if (venda.status !== 'concluida') {
+    throw conflito('Esta venda já foi cancelada.');
+  }
+
+  const pago = await query(
+    'SELECT COALESCE(SUM(valor), 0) AS pago FROM pagamento_fiado WHERE venda_id = $1',
+    [id]
+  );
+  if (Number(pago.rows[0].pago) > 0) {
+    throw conflito(
+      'Esta venda já teve pagamento recebido. Devolva o valor ao cliente antes de corrigir.'
+    );
+  }
+
+  if (usuario.papel === 'dono') return venda;
+
+  if (venda.usuario_id !== usuario.id) {
+    // 404 e não 403: dizer "existe, mas não é sua" já confirmaria a venda
+    // a quem não deveria saber dela — mesma regra de buscarVenda.
+    throw naoEncontrado('Venda não encontrada');
+  }
+
+  // "Mesmo dia" é o dia do calendário, não 24 horas: uma venda das 18h de
+  // ontem não deve ser corrigível às 8h de hoje só porque cabe na janela.
+  const hoje = new Date();
+  const dataVenda = new Date(venda.vendida_em);
+  const mesmoDia =
+    hoje.getFullYear() === dataVenda.getFullYear() &&
+    hoje.getMonth() === dataVenda.getMonth() &&
+    hoje.getDate() === dataVenda.getDate();
+
+  if (!mesmoDia) {
+    throw conflito('Só o dono corrige venda de outro dia. Peça para ele.');
+  }
+
+  return venda;
+}
+
+// Cancela a venda e devolve os dados para reabri-la preenchida.
+//
+// Não edita nada: `item_venda` continua congelado (RF12) e a venda
+// original permanece no histórico como cancelada. Quem grava a versão
+// corrigida é o fluxo normal de criarVenda, o que mantém uma única porta
+// de entrada para venda no sistema.
+export async function prepararCorrecao(id, usuario) {
+  const venda = await exigirVendaCorrigivel(id, usuario);
+  await cancelarVenda(id);
+
+  return {
+    cancelada: venda.id,
+    // O molde carrega produto_id (não o nome): a tela remonta os itens a
+    // partir do catálogo atual, e um produto desativado desde a venda
+    // aparece como ausente em vez de ser revendido silenciosamente.
+    molde: {
+      cliente_id: venda.cliente_id,
+      cliente_nome: venda.cliente_nome,
+      cliente_telefone: venda.cliente_telefone,
+      forma_pagamento: venda.forma_pagamento,
+      desconto: Number(venda.desconto),
+      itens: (venda.itens || []).map((i) => ({
+        produto_id: i.produto_id,
+        produto_nome: i.produto_nome,
+        quantidade: Number(i.quantidade),
+        preco_unitario: Number(i.preco_unitario),
+      })),
+    },
+  };
 }
 
 // Vendas recentes de um cliente — como o Zé acha "a venda do Marcos de

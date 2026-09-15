@@ -1,5 +1,29 @@
 # Colocar o Prumo no ar
 
+## Publicação no Vercel — setembro de 2026
+
+O `vercel.json` da raiz publica `FrontEnd` (Vite) e `BackEnd` (Express)
+como serviços do mesmo projeto. `/api/*` vai para a API; os demais
+endereços vão para o frontend, incluindo acesso direto às rotas React.
+O cookie de sessão e as chamadas relativas a `/api` ficam no mesmo domínio.
+
+No Vercel, a entrada é `BackEnd/src/app.js`. `server.js` continua sendo
+a entrada local/Docker. Por isso, antes de publicar mudanças no banco,
+aplique as migrações com `npm run migrar --prefix BackEnd`, carregando
+o ambiente de produção. No Neon, use a conexão direta para esse comando:
+o migrador usa um lock de sessão, que não deve passar pelo pooler.
+Criação do schema e administrador são feitas uma única vez na preparação
+do banco; não acontecem a cada chamada da função.
+
+As variáveis são configuradas no projeto Vercel, no ambiente `production`.
+Os arquivos `.env`, backups e dependências locais ficam fora do upload.
+A branch de produção é `main`. A configuração abaixo é o guia original;
+as observações sobre escolha de hospedagem foram resolvidas pelo Vercel
+com PostgreSQL no Neon.
+
+Verificações após publicar: `/api/health`, login e renovação da sessão,
+consultas do painel, abertura direta de `/vendas` e conexão do assistente.
+
 Guia para quando o sistema sair do computador de desenvolvimento. Escrito
 em 16/08/2026, com o caminho que o Benedito considerou: **banco no Neon,
 backend e frontend em plataforma gerenciada.**

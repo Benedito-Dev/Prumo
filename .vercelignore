@@ -1,0 +1,14 @@
+.git
+.claude
+.agents
+.codex
+.env
+**/.env
+**/.env.*
+**/node_modules
+backups
+docs
+scripts
+**/*.test.mjs
+**/Dockerfile.dev
+docker-compose.yml

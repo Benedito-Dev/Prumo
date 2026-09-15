@@ -7,8 +7,8 @@
 **/.env.*
 **/node_modules
 backups
-docs
-scripts
+/docs/
+/scripts/
 **/*.test.mjs
 **/Dockerfile.dev
 docker-compose.yml
